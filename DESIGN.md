@@ -1,0 +1,79 @@
+# balloon-sim design
+
+Every piece of code here exists because a decision below needs it. Decisions are locked by Shaurya and Rohan.
+
+## The experiment
+
+How well can a balloon controller do as the wind forecast gets worse, compared to what any controller could do?
+
+## Locked decisions
+
+1. **Task: a single leg.** Fixed start, fixed goal, 80 steps of 3 h. Cost $J = \sum_{k=1}^{80} \lVert x_k - \text{goal} \rVert$.
+   The same start, goal and true wind for every controller and noise level within a seed.
+2. **Outputs.** Every run records both metrics: summed distance and final distance to the goal. For each MPC
+   horizon, two figures of the same form (one per metric) against noise σ, with lines for hindsight, best fixed
+   plan and MPC at several n_winds, plus the normalised score. Hindsight and fixed plan always plan the full
+   80 steps, so their lines are shared across horizon figures. The cost the planners optimise is a parameter
+   (summed or final); the bounds are guaranteed only for the metric that was optimised.
+3. **Belief.** Behind an interface. Version 1 is fixed: the GP prior with the forecast as mean, never updated.
+   An updating belief (readings at the balloon) comes later and must slot in without changing controllers.
+4. **Wind.** One record format: true wind and coordinates on a (time, level, lat, lon) grid. Version 1 uses the
+   ERA5 wide North Pacific record. cBottle comes later through the same format.
+5. **Noise.** Forecast $F = W - e$ with $e$ drawn from the belief's own kernel at scale σ. The truth $W$ never
+   changes with σ, and the belief is calibrated by construction.
+6. **Position: latitude and longitude in degrees**, longitude 0 to 360. No projection: both the ERA5 and the
+   converted cBottle records are regular lat/lon grids. Grid spacing, box and time step are read from the file,
+   never hard-coded (ERA5 wide: 2 deg, 3 h; cBottle: 1 deg, 6 h). One step moves
+   $\Delta\text{lat} = v\,\Delta t / R$ and $\Delta\text{lon} = u\,\Delta t / (R \cos \text{lat})$, in radians.
+   Distance in the cost is great-circle distance in km.
+7. **Altitude in km.**
+8. **Action: climb rate in km per step**, capped.
+9. **Integration: one Euler step per 3 h move**, with the number of substeps as a parameter.
+10. **One planner, three controllers.** The planner takes a state, a batch of winds and a horizon, and returns an
+    action sequence. Hindsight plans once on the true wind. Fixed plan plans once on belief draws. MPC replans
+    every step on belief draws.
+11. **Planner: Myles's FOMPC recipe** (random candidates, previous plan, coast; best refined by normalised
+    gradient descent), every number a parameter.
+
+12. **Belief draws by random Fourier features**, as in zermelo: a product kernel whose factors each draw their
+    own frequencies. Horizontal distance is measured on the unit sphere in 3D, so the same code works for a
+    global cBottle field. The forecast noise is drawn by the same sampler, so belief and noise share a kernel.
+    Chosen because it extends to an updating belief (pathwise conditioning) and is the published method.
+13. **Every wind is a grid field.** Truth, forecast and each belief draw are the same type: an array on the
+    record's grid plus one interpolation function. The planner never knows which it is flying.
+14. **Environment: uv.**
+15. **Running experiments: three scripts.** `run_cell.py` runs one (seed, σ, controller, horizon, n_winds) and
+    writes one row; `submit.py` lists cells and submits a Slurm array; `plot.py` reads rows and draws figures.
+16. **Layout: one file per idea.**
+
+    ```
+    balloon_sim/
+      wind.py         grid record, loading, interpolation
+      dynamics.py     one step, a rollout, the costs
+      belief.py       Belief interface, the fixed GP prior, drawing winds
+      planner.py      Myles's recipe
+      controllers.py  hindsight, fixed plan, MPC
+      episode.py      fly one controller in the true wind, return trajectory and metrics
+    scripts/          run_cell.py, submit.py, plot.py
+    tests/
+    ```
+
+17. **Types and tests.** Plain type hints, shape comments only where shapes are not obvious. Tests check physics
+    and math: gradient vs finite differences, still air, belief draws match the kernel's variance, and the three
+    controllers ordered correctly on a toy wind.
+18. **Start and goal.** Two modes: drawn per seed (start inside the box with a margin, goal at distance D in a
+    random direction, redrawn if outside) or fixed coordinates. D defaults to 1,000 km. The noise draw is
+    per seed in both modes.
+19. **Edges.** The simulator clips position to the box and altitude to the record's range. The planner's own
+    rollout never clips, so its gradient never dies at a wall.
+20. **Start altitude** at the middle of the range; **climb cap** 1.1 km per step.
+21. **Configuration.** One `config.py` of frozen dataclasses, one per piece (wind, balloon, task, noise and belief,
+    planner, experiment), defaults in code, overridden from the command line. Every result row stores the full
+    config it ran with. No YAML, no Hydra.
+22. **JAX**, limited to `jnp`, `grad`, `vmap`, `jit`, and `lax.scan` in the rollout only. Every function pure, so
+    many seeds can later be flown at once on one GPU.
+
+## Open
+
+- Kernel numbers: keep the hand-set values (800 km, about 3 km, 24 h, Matérn) or fit them to the record's
+  forecast error.
