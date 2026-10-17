@@ -23,8 +23,10 @@ def step(field: WindField, state: State, climb_km: jax.Array, step_hours: float,
     Each substep reads the wind once at its start and moves in a straight line (Euler):
         lat += v dt / R
         lon += u dt / (R cos lat)
-        altitude += climb_km / substeps
-    Nothing is clipped here, so the planner's gradient never dies at a wall. The simulator clips (see clip).
+        altitude += climb_km / substeps, then held inside the record's levels
+    Altitude is held here, so the planner and the simulator agree on it exactly; past the floor or ceiling a climb
+    has no effect and no gradient. Position is not held here, so the planner's gradient never dies at the box's
+    edge; the simulator holds it (see clip).
     """
     dt_s = step_hours * 3600.0 / substeps
     for _ in range(substeps):
@@ -34,7 +36,7 @@ def step(field: WindField, state: State, climb_km: jax.Array, step_hours: float,
         state = State(
             state.lat + dlat,
             state.lon + dlon,
-            state.altitude_km + climb_km / substeps,
+            jnp.clip(state.altitude_km + climb_km / substeps, field.altitude_km[0], field.altitude_km[-1]),
             state.hours + step_hours / substeps,
         )
     return state
@@ -52,11 +54,11 @@ def rollout(field: WindField, state: State, climbs_km: jax.Array, step_hours: fl
 
 
 def clip(field: WindField, state: State) -> State:
-    """The simulator's limits: position held inside the record's box, altitude inside its levels"""
+    """The simulator's limit on position: held inside the record's box (altitude is already held by step)"""
     return State(
         jnp.clip(state.lat, field.lat[0], field.lat[-1]),
         jnp.clip(state.lon, field.lon[0], field.lon[-1]),
-        jnp.clip(state.altitude_km, field.altitude_km[0], field.altitude_km[-1]),
+        state.altitude_km,
         state.hours,
     )
 

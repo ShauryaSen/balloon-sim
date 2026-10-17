@@ -2,7 +2,6 @@ import dataclasses
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from balloon_sim.config import BalloonConfig, PlannerConfig
 from balloon_sim.controllers import Controller, hindsight
@@ -52,10 +51,8 @@ def test_the_simulator_holds_the_balloon_inside_the_box():
     assert jnp.isclose(flight.visited.lon[-1], 200.0)
 
 
-@pytest.mark.xfail(strict=True, reason="open decision: the planner does not know the altitude limits the simulator enforces")
 def test_hindsight_flies_the_cost_it_planned():
-    """With the true wind known, the flown cost should equal the planned one. It does not yet: the plan sinks below
-    the record's lowest level, the simulator stops the balloon there, and from then on plan and flight disagree"""
+    """With the true wind known, the flown cost equals the planned one: the planner holds altitude where the simulator does"""
     truth, goal = field(15.0, -15.0), (jnp.array(30.0), jnp.array(156.0))
     flight = fly(BALLOON, hindsight(BALLOON, SMALL, truth, *goal, MOVES), truth, START, *goal, MOVES, jax.random.key(0))
     imagined = summed_cost(rollout(truth, START, flight.climbs_km, BALLOON.step_hours), *goal)

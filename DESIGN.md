@@ -33,8 +33,8 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     action sequence. Hindsight plans once on the true wind. Fixed plan plans once on belief draws. MPC replans
     every step on belief draws.
 11. **Planner: Myles's FOMPC recipe** (random candidates, previous plan, coast; best refined by normalised
-    gradient descent), every number a parameter. The refinement optimiser is selectable: L-BFGS, or a
-    standard first-order optimiser.
+    gradient descent), every number a parameter. The refinement optimiser is selectable: L-BFGS (the
+    default, after it found much better hindsight plans on ERA5) or Myles's normalised gradient descent.
 
 12. **Belief draws by random Fourier features**, as in zermelo: a product kernel whose factors each draw their
     own frequencies. Horizontal distance is measured on the unit sphere in 3D, so the same code works for a
@@ -66,8 +66,10 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
 18. **Start and goal.** Two modes: drawn per seed (start inside the box with a margin, goal at distance D in a
     random direction, redrawn if outside) or fixed coordinates. D defaults to 1,000 km. The noise draw is
     per seed in both modes.
-19. **Edges.** The simulator clips position to the box and altitude to the record's range. The planner's own
-    rollout never clips, so its gradient never dies at a wall.
+19. **Edges.** Altitude is held inside the record's levels by the step itself, so the planner and the simulator agree
+    on it exactly; at the floor or ceiling a climb past it has no gradient. Position is held to the box by the
+    simulator only, so the planner's gradient never dies at the box's edge. (Changed after the first ERA5 run,
+    where an unclipped planner dived to 11 km under a 14.8 km floor and its plans stopped matching the flights.)
 20. **Start altitude** at the middle of the range; **climb cap** 1.1 km per step.
 21. **Configuration.** One `config.py` of frozen dataclasses, one per piece (wind, balloon, task, noise and belief,
     planner, experiment), defaults in code, overridden from the command line. Every result row stores the full
@@ -82,4 +84,3 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
 
 ## Open
 
-- Which standard first-order optimiser sits beside L-BFGS (Myles's normalised gradient descent, Adam, or both).

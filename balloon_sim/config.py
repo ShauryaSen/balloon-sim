@@ -18,7 +18,7 @@ class PlannerConfig:
     candidates: int = 100  # random plans in the pool, beside the previous plan and coast
     descend_top: int = 1  # how many of the best candidates are refined
     perturbation: float = 0.2  # half-width of the small random climbs, as a fraction of the cap
-    optimizer: Literal["normalised", "lbfgs"] = "normalised"  # how the best candidates are refined
+    optimizer: Literal["lbfgs", "normalised"] = "lbfgs"  # how the best candidates are refined; "normalised" is Myles's
     iterations: int = 100  # refinement steps, at most
     step_size: float = 1.0  # normalised gradient descent's step
     tolerance: float = 1e-7  # stop refining once the gradient is this small

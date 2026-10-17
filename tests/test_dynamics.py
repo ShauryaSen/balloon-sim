@@ -76,7 +76,14 @@ def test_gradient_matches_finite_differences():
         assert jnp.allclose(analytic, numeric, rtol=1e-5, atol=1e-6)
 
 
-def test_clip_holds_the_balloon_inside_the_record():
-    outside = State(jnp.array(80.0), jnp.array(90.0), jnp.array(25.0), jnp.array(6.0))
+def test_clip_holds_the_balloon_inside_the_box():
+    outside = State(jnp.array(80.0), jnp.array(90.0), jnp.array(17.0), jnp.array(6.0))
     held = clip(uniform_field(0.0, 0.0), outside)
-    assert jnp.allclose(jnp.array(held), jnp.array([70.0, 100.0, 20.0, 6.0]))
+    assert jnp.allclose(jnp.array(held), jnp.array([70.0, 100.0, 17.0, 6.0]))
+
+
+def test_step_holds_altitude_inside_the_levels():
+    """The levels run 15 to 20 km: a climb past the ceiling stops at it, and so does a sink past the floor"""
+    field = uniform_field(0.0, 0.0)
+    assert jnp.allclose(step(field, start(), jnp.array(5.0), STEP_HOURS).altitude_km, 20.0)
+    assert jnp.allclose(step(field, start(), jnp.array(-5.0), STEP_HOURS).altitude_km, 15.0)
