@@ -33,7 +33,8 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     action sequence. Hindsight plans once on the true wind. Fixed plan plans once on belief draws. MPC replans
     every step on belief draws.
 11. **Planner: Myles's FOMPC recipe** (random candidates, previous plan, coast; best refined by normalised
-    gradient descent), every number a parameter.
+    gradient descent), every number a parameter. The refinement optimiser is selectable: L-BFGS, or a
+    standard first-order optimiser.
 
 12. **Belief draws by random Fourier features**, as in zermelo: a product kernel whose factors each draw their
     own frequencies. Horizontal distance is measured on the unit sphere in 3D, so the same code works for a
@@ -54,7 +55,8 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
       planner.py      Myles's recipe
       controllers.py  hindsight, fixed plan, MPC
       episode.py      fly one controller in the true wind, return trajectory and metrics
-    scripts/          run_cell.py, submit.py, plot.py
+      config.py       one frozen dataclass per piece
+    scripts/          run_cell.py, submit.py, plot.py, fit_kernel.py
     tests/
     ```
 
@@ -73,7 +75,11 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
 22. **JAX**, limited to `jnp`, `grad`, `vmap`, `jit`, and `lax.scan` in the rollout only. Every function pure, so
     many seeds can later be flown at once on one GPU.
 
+23. **Kernel fitted to data.** `scripts/fit_kernel.py` fits the lengthscales and amplitude to a record's forecast
+    error (truth minus forecast). The fitted numbers become the config defaults for that record.
+24. **Build order.** wind, dynamics, planner, hindsight end to end, belief with fixed plan and MPC, scripts. Each
+    step tested before the next.
+
 ## Open
 
-- Kernel numbers: keep the hand-set values (800 km, about 3 km, 24 h, Matérn) or fit them to the record's
-  forecast error.
+- Which standard first-order optimiser sits beside L-BFGS (Myles's normalised gradient descent, Adam, or both).
