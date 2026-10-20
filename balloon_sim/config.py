@@ -34,3 +34,20 @@ class BeliefConfig:
     altitude_km: float = 3.3  # the same, between altitudes (zermelo's 3 levels, about 1.1 km apart)
     hours: float = 24.0  # the same, between times
     n_features: int = 256  # random Fourier features per draw: more is closer to the exact kernel, but slower
+
+
+@dataclass(frozen=True)
+class TaskConfig:
+    """Where an episode starts and where its goal is (decision 18)"""
+
+    mode: Literal["random", "fixed"] = "random"
+    n_moves: int = 80  # length of an episode
+    start_hours: float = 0.0  # when in the record the episode starts
+    # random mode: a start drawn inside the box, the goal distance_km away in a random direction
+    distance_km: float = 1000.0
+    margin_deg: float = 3.0  # start and goal at least this far inside the box's edges
+    # fixed mode: these exact coordinates
+    start_lat: float | None = None
+    start_lon: float | None = None
+    goal_lat: float | None = None
+    goal_lon: float | None = None

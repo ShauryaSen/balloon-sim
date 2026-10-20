@@ -55,6 +55,8 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
       planner.py      Myles's recipe
       controllers.py  hindsight, fixed plan, MPC
       episode.py      fly one controller in the true wind, return trajectory and metrics
+      task.py         where an episode starts and where its goal is
+      results.py      the result row: its columns, writing and reading
       config.py       one frozen dataclass per piece
     scripts/          run_cell.py, submit.py, plot.py, fit_kernel.py
     tests/
