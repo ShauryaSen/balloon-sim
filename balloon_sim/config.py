@@ -51,3 +51,30 @@ class TaskConfig:
     start_lon: float | None = None
     goal_lat: float | None = None
     goal_lon: float | None = None
+
+
+@dataclass(frozen=True)
+class WindConfig:
+    """Which record an episode flies in"""
+
+    path: str = "records/era5_npac_wide.npz"  # a .npz holding u, v, hours, altitude_km, latitude, longitude
+
+
+@dataclass(frozen=True)
+class ExperimentConfig:
+    """The grid of cells a sweep runs. One cell is one (controller, seed, sigma, horizon, n_winds) flight.
+
+    Not every axis applies to every controller, so `cells` leaves out the combinations that would repeat a
+    flight: hindsight reads the truth, so neither sigma nor n_winds nor the horizon changes what it does, and
+    the fixed plan commits to the whole episode at once, so the MPC horizon does not reach it either.
+    """
+
+    seeds: tuple[int, ...] = tuple(range(32))
+    sigmas: tuple[float, ...] = (0.0, 0.7, 1.4, 2.8, 5.6, 11.2)
+    """Forecast error in m/s per component. 2.8 is the record's own, so the ladder is 0, a quarter, a half,
+    one, two and four times a real 24 h forecast. Denser below the real error than above it, because the
+    zermelo sweep found performance flat up to about half of it and falling smoothly after"""
+
+    horizons: tuple[int, ...] = (10, 20, 40)  # moves the MPC plans ahead
+    n_winds: tuple[int, ...] = (0, 8)  # belief draws a plan is averaged over; 0 is the belief's mean alone
+    controllers: tuple[str, ...] = ("hindsight", "fixed_plan", "mpc")

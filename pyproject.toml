@@ -6,6 +6,7 @@ dependencies = [
     "jax",
     "numpy",
     "optax>=0.2.8",
+    "matplotlib>=3.9",
 ]
 
 [dependency-groups]

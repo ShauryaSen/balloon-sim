@@ -1,1 +1,114 @@
-"""Run one cell: one seed, noise level, controller, horizon and n_winds; write one row"""
+"""Fly one cell and write one row
+
+    uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 2.8 --horizon 20 --n-winds 8
+
+Every setting is a command-line flag named `<piece>.<field>`, so `--planner.iterations 200` or
+`--belief.horizontal_km 600` override a default without touching the code. The row carries the full
+configuration it ran with, so a result can always be traced back to the settings that produced it.
+"""
+
+import argparse
+import dataclasses
+import sys
+import time
+from pathlib import Path
+
+import jax
+import jax.numpy as jnp
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from balloon_sim.belief import FixedBelief, forecast
+from balloon_sim.cells import keys
+from balloon_sim.config import BalloonConfig, BeliefConfig, PlannerConfig, TaskConfig, WindConfig
+from balloon_sim.controllers import fixed_plan, hindsight, mpc
+from balloon_sim.episode import fly
+from balloon_sim.results import row, write_rows
+from balloon_sim.task import draw_task
+from balloon_sim.wind import load_record
+
+PIECES = {"wind": WindConfig, "balloon": BalloonConfig, "planner": PlannerConfig, "belief": BeliefConfig, "task": TaskConfig}
+"""The configs a flight is built from, by the name their fields are prefixed with"""
+
+
+def reader(annotation) -> type:
+    """How a flag's text becomes a value. A field annotated `float | None` reads as a float, and anything that
+    is not plainly a number stays text for the dataclass to make sense of"""
+    if annotation in (int, float, str):
+        return annotation
+    for kind in (int, float):
+        if annotation in (kind | None, f"{kind.__name__} | None"):
+            return kind
+    return str
+
+
+def parser() -> argparse.ArgumentParser:
+    """The cell's own arguments, then one flag per field of every config"""
+    ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ask.add_argument("--controller", required=True, choices=("hindsight", "fixed_plan", "mpc"))
+    ask.add_argument("--seed", type=int, required=True)
+    ask.add_argument("--sigma", type=float, required=True, help="the forecast's error, overriding belief.sigma")
+    ask.add_argument("--horizon", type=int, help="moves the MPC plans ahead, overriding planner.horizon")
+    ask.add_argument("--n-winds", type=int, default=0, help="belief draws a plan is averaged over; 0 is its mean")
+    ask.add_argument("--out", default="results/rows.jsonl", help="the .jsonl the row is added to")
+    for piece, config in PIECES.items():
+        for field in dataclasses.fields(config):
+            kind = reader(field.type)
+            ask.add_argument(f"--{piece}.{field.name}", type=kind, default=None, dest=f"{piece}.{field.name}")
+    return ask
+
+
+def configured(asked: dict) -> dict:
+    """One config per piece, its defaults overridden by whatever was given on the command line"""
+    built = {}
+    for piece, config in PIECES.items():
+        given = {f.name: asked[f"{piece}.{f.name}"] for f in dataclasses.fields(config) if asked.get(f"{piece}.{f.name}") is not None}
+        built[piece] = dataclasses.replace(config(), **given)
+    return built
+
+
+def build(asked: dict):
+    """The cell's own flags land on the configs they belong to, so a row records one consistent set"""
+    pieces = configured(asked)
+    pieces["belief"] = dataclasses.replace(pieces["belief"], sigma=asked["sigma"])
+    if asked["horizon"] is not None:
+        pieces["planner"] = dataclasses.replace(pieces["planner"], horizon=asked["horizon"])
+    return pieces
+
+
+def main(argv: list[str] | None = None) -> None:
+    asked = vars(parser().parse_args(argv))
+    pieces = build(asked)
+    wind, balloon, planner, belief_config, task_config = (pieces[name] for name in PIECES)
+
+    truth = load_record(wind.path)
+    k_task, k_noise, k_fly = keys(asked["seed"])
+    task = draw_task(task_config, k_task, truth)
+
+    # the forecast is the truth under one error field; at sigma = 0 that field is zero and the two agree
+    believed = FixedBelief(belief_config, forecast(belief_config, k_noise, truth))
+    n_moves, n_winds = task_config.n_moves, asked["n_winds"]
+    if asked["controller"] == "hindsight":
+        controller = hindsight(balloon, planner, truth, task.goal_lat, task.goal_lon, n_moves)
+    elif asked["controller"] == "fixed_plan":
+        controller = fixed_plan(balloon, planner, believed, task.goal_lat, task.goal_lon, n_moves, n_winds)
+    else:
+        controller = mpc(balloon, planner, believed, task.goal_lat, task.goal_lon, n_winds)
+
+    began = time.perf_counter()
+    flight = fly(balloon, controller, truth, task.start, task.goal_lat, task.goal_lon, n_moves, k_fly)
+    jax.block_until_ready(flight.summed_km)  # JAX is lazy, so the clock would otherwise stop before the flight
+    seconds = time.perf_counter() - began
+
+    written = row(
+        flight, task, controller=asked["controller"], n_winds=n_winds, seed=asked["seed"], seconds=seconds, settings=pieces
+    )
+    Path(asked["out"]).parent.mkdir(parents=True, exist_ok=True)
+    write_rows(asked["out"], [written])
+    print(f"{asked['controller']:10s} seed {asked['seed']:3d} sigma {asked['sigma']:5.2f} "
+          f"horizon {planner.horizon:3d} n_winds {n_winds:2d}  "
+          f"summed {float(flight.summed_km):10.1f} km  final {float(flight.final_km):8.1f} km  {seconds:6.1f} s")
+
+
+if __name__ == "__main__":
+    main()
