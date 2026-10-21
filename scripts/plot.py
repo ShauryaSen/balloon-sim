@@ -138,8 +138,9 @@ def draw_score(lines: dict, sigmas: list[float], metric: str, into: Path, title:
         score = (fixed plan - MPC) / (fixed plan - hindsight)
 
     1 means MPC did as well as a controller that knew the wind, and 0 means it did no better than committing
-    to a plan and flying it blind. A seed whose fixed plan and hindsight agree has no gap to divide by and is
-    left out of the average rather than allowed to explode it.
+    to a plan and flying it blind. The score is a ratio, so it is summarised by its median over seeds with the
+    quartiles as the bar, and a seed whose fixed plan is within 5% of hindsight has no gap worth dividing by
+    and is left out: near sigma = 0 the two agree, and a mean of ratios there swings to +-20.
     """
     hind = lines.get(("hindsight", 0))
     if hind is None:
@@ -152,19 +153,19 @@ def draw_score(lines: dict, sigmas: list[float], metric: str, into: Path, title:
         floor = lines.get(("fixed_plan", which[1]))
         if floor is None:
             continue
-        means, errors = [], []
+        medians, low, high = [], [], []
         for sigma in sigmas:
             scores = []
             for seed, mpc_row in line.get(sigma, {}).items():
                 if seed not in floor.get(sigma, {}) or seed not in hind_by_seed:
                     continue
                 gap = floor[sigma][seed][metric] - hind_by_seed[seed][metric]
-                if abs(gap) > 1e-9:  # nothing to capture, so the fraction is undefined rather than huge
+                if gap > 0.05 * hind_by_seed[seed][metric]:  # a gap worth dividing by
                     scores.append((floor[sigma][seed][metric] - mpc_row[metric]) / gap)
             values = np.array(scores, dtype=float)
-            means.append(values.mean() if values.size else np.nan)
-            errors.append(values.std(ddof=1) / np.sqrt(values.size) if values.size > 1 else np.nan)
-        panel.errorbar(sigmas, means, yerr=errors, label=label(*which), color=colour(*which), linestyle=STYLE[which[0]],
+            q = np.percentile(values, [25, 50, 75]) if values.size >= 4 else np.array([np.nan] * 3)
+            medians.append(q[1]); low.append(q[1] - q[0]); high.append(q[2] - q[1])
+        panel.errorbar(sigmas, medians, yerr=[low, high], label=label(*which), color=colour(*which), linestyle=STYLE[which[0]],
                        marker="o", markersize=4, capsize=3, linewidth=1.5)
     panel.axhline(1.0, color="#999999", linewidth=0.9, linestyle=":", zorder=0)  # as good as knowing the wind
     panel.axhline(0.0, color="#999999", linewidth=0.9, zorder=0)  # no better than a blind plan
@@ -199,7 +200,7 @@ def main(argv: list[str] | None = None) -> None:
             named = f"{METRICS[metric].split(' (')[0]}, MPC horizon {horizon}"
             draw_lines(lines, sigmas, metric, into / f"lines_{stem}.png", named)
             draw_violins(lines, sigmas, metric, into / f"violins_{stem}.png", named)
-            draw_score(lines, sigmas, metric, into / f"score_{stem}.png", f"Where MPC sits between the bounds: {named}")
+            draw_score(lines, sigmas, metric, into / f"score_{stem}.png", f"MPC between the bounds: {named}")
     print(f"wrote {len(list(into.glob('*.png')))} figures under {into}")
 
 
