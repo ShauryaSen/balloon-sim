@@ -70,17 +70,31 @@ def candidates(
     return jnp.concatenate([random, previous, coast])
 
 
+def _best_so_far(loss, z: jax.Array, improve, iterations: int, memory=None) -> jax.Array:
+    """Runs `improve` for `iterations` steps from z and returns the best iterate seen, not the last: a line
+    search or a fixed step can wander uphill, and a refinement must never hand back a worse plan than it was given"""
+
+    def one(carry, _):
+        z, memory, best_z, best_cost = carry
+        z, memory = improve(z, memory)
+        cost = loss(z)
+        better = cost < best_cost
+        return (z, memory, jnp.where(better, z, best_z), jnp.where(better, cost, best_cost)), None
+
+    (_, _, best_z, _), _ = jax.lax.scan(one, (z, memory, z, loss(z)), None, length=iterations)
+    return best_z
+
+
 def _normalised_descent(planner: PlannerConfig, loss, z: jax.Array) -> jax.Array:
     """Myles's refinement: a step of fixed length against the gradient, z <- z - eta g / |g|, held once |g| is tiny"""
 
-    def improve(z: jax.Array, _) -> tuple[jax.Array, None]:
+    def improve(z: jax.Array, memory) -> tuple[jax.Array, None]:
         g = jax.grad(loss)(z)
         norm = jnp.linalg.norm(g)
         moved = z - planner.step_size * g / (norm + 1e-12)
         return jnp.where(norm < planner.tolerance, z, moved), None
 
-    z, _ = jax.lax.scan(improve, z, None, length=planner.iterations)
-    return z
+    return _best_so_far(loss, z, improve, planner.iterations)
 
 
 def _lbfgs(planner: PlannerConfig, loss, z: jax.Array) -> jax.Array:
@@ -88,16 +102,14 @@ def _lbfgs(planner: PlannerConfig, loss, z: jax.Array) -> jax.Array:
     solver = optax.lbfgs()
     value_and_grad = optax.value_and_grad_from_state(loss)
 
-    def improve(carry, _):
-        z, memory = carry
+    def improve(z: jax.Array, memory):
         value, g = value_and_grad(z, state=memory)
         updates, next_memory = solver.update(g, memory, z, value=value, grad=g, value_fn=loss)
         done = jnp.linalg.norm(g) < planner.tolerance
         keep = lambda old, new: jnp.where(done, old, new)
-        return jax.tree.map(keep, (z, memory), (optax.apply_updates(z, updates), next_memory)), None
+        return jax.tree.map(keep, (z, memory), (optax.apply_updates(z, updates), next_memory))
 
-    (z, _), _ = jax.lax.scan(improve, (z, solver.init(z)), None, length=planner.iterations)
-    return z
+    return _best_so_far(loss, z, improve, planner.iterations, solver.init(z))
 
 
 @functools.partial(jax.jit, static_argnames=("balloon", "planner"))

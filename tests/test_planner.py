@@ -79,3 +79,19 @@ def test_moves_after_the_episode_ends_do_not_count():
     assert jnp.allclose(cost(a), cost(changed_tail))
     first_three = rollout(field, START, BALLOON.climb_cap_km * a[:3], BALLOON.step_hours)
     assert jnp.allclose(cost(a), summed_cost(first_three, *GOAL), rtol=1e-5)
+
+
+def test_refinement_never_returns_a_worse_plan_and_more_iterations_never_hurt():
+    """The refined plan costs no more than the best candidate it started from, and 500 iterations cost no more
+    than 100: a line search that wanders uphill is not allowed to hand back where it ended"""
+    from balloon_sim.planner import candidates, expected_cost
+
+    field = east_low_west_high()
+    winds = batch_of(field, 1)
+    key = jax.random.key(0)
+    pool = candidates(BALLOON, SMALL, key, START, jnp.zeros(8), winds.altitude_km[0], winds.altitude_km[-1])
+    best_candidate = jnp.min(jax.vmap(lambda a: expected_cost(BALLOON, SMALL, a, winds, START, *GOAL, jnp.array(8)))(pool))
+    few = plan(BALLOON, SMALL, key, winds, START, *GOAL, jnp.zeros(8), jnp.array(8))
+    many = plan(BALLOON, dataclasses.replace(SMALL, iterations=500), key, winds, START, *GOAL, jnp.zeros(8), jnp.array(8))
+    assert cost_of(field, few) <= best_candidate + 1e-3
+    assert cost_of(field, many) <= cost_of(field, few) + 1e-3
