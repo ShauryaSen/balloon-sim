@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from balloon_sim.cells import cells
-from balloon_sim.config import ExperimentConfig, TaskConfig
+from balloon_sim.config import BeliefConfig, ExperimentConfig, TaskConfig
 
 ARRAY = """#!/bin/bash
 #SBATCH --job-name={name}
@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> None:
     asked = ask.parse_args(argv)
 
     root = Path(__file__).resolve().parents[1]
-    grid = cells(ExperimentConfig(), TaskConfig().n_moves)
+    grid = cells(ExperimentConfig(), TaskConfig().n_moves, BeliefConfig().sigma)
     lines = [flags(cell) for cell in grid]
 
     counted: dict[str, int] = {}

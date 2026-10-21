@@ -57,8 +57,9 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
       episode.py      fly one controller in the true wind, return trajectory and metrics
       task.py         where an episode starts and where its goal is
       results.py      the result row: its columns, writing and reading
+      cells.py        which flights a sweep is made of, and the keys a flight is drawn from
       config.py       one frozen dataclass per piece
-    scripts/          run_cell.py, submit.py, plot.py, fit_kernel.py
+    scripts/          run_cell.py, submit.py, plot.py, fit_kernel.py, convert_cbottle.py
     tests/
     ```
 
@@ -86,20 +87,28 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
 
 25. **The belief learns before the sweep runs.** At each move the balloon reads the wind where it is and the belief
     conditions on it (pathwise update of the random Fourier draws), so MPC plans on what it has learned. Hindsight
-    and the fixed plan do not learn: one knows the truth, the other never looks.
+    and the fixed plan do not learn: one knows the truth, the other never looks. A reading is the true wind at
+    the balloon's own point, exactly, as zermelo's default readout; the belief assumes a 0.01 m/s jitter on it,
+    which is what zermelo does and is numerical, not a modelled error.
 26. **Kernel fitted to the record's stale forecast** (truth minus the truth 24 h earlier) as the headline: errors
     shaped like a day-old forecast's. On the ERA5 wide record that gives 544 km, 1.18 km in altitude, 9.4 h,
     2.79 m/s, against 1,013 km, 3.54 km, 58 h when fitted to the wind itself. A stale forecast can be built from any
-    time series, so the same fit works on cBottle.
+    time series (`fit_kernel.py --stale-hours 24`), and on `cbottle_jul_s100` it gives 578 km, 4.4 km, 9.9 h,
+    5.9 m/s: the config's defaults. The sweep's noise levels are multiples of that fitted sigma, so the ladder
+    means the same thing on any record.
 27. **Both metrics plotted**, summed and final distance; which one leads is Sarah's call.
-28. **cBottle is the wind source**, global, so there is no box edge (Sarah's call to use cBottle). Needs longitude
-    wrapping at 0/360 and a latitude limit away from the poles.
+28. **cBottle is the wind source**, global, so there is no box edge (Sarah's call to use cBottle). The released
+    cBottle-video rollouts (four on Unicorn, 14 days at 6 h), converted by `scripts/convert_cbottle.py` to a 2
+    degree global grid between 80S and 80N at the 200 and 50 hPa levels (11.8 and 20.6 km), the two levels it
+    offers in the balloon band; the balloon is confined between them. Longitude wraps at 360 (the record carries
+    its first column again at 360 so the blend crosses the seam); starts and goals stay within 60 degrees of the
+    equator. Shaurya's retrained 18-level generator replaces it once time-stitching exists.
+29. **Six-hour moves**, the cBottle frame: the climb cap is 2.2 km per move (1.1 km per 3 h) and an episode is
+    50 moves, 12.5 days of a 14-day rollout.
 
 ## Open
 
-- Which cBottle: the released cBottle-video (global, 14-day rollouts, but only 11.8, 20.6 and 31 km near the
-  flight band) or Shaurya's retrained two-stage generator (18 levels, 14.3 to 20.2 km, but 48 h blocks until
-  time-stitching is built).
-- With released cBottle, the altitude range the balloon may use.
-- What a reading is (the balloon's point or its whole column) and how noisy it is.
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.
+- Goal distance: 1,000 km is one or two moves at jet speed; the reachability check over seeds decides.
+- Myles's normalised descent stalls under the 6 h move (about twice L-BFGS's cost on the test wind); it stays
+  as the option it is, not the default.

@@ -18,7 +18,7 @@ import jax.numpy as jnp
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.belief import FixedBelief, forecast
+from balloon_sim.belief import GPBelief, forecast
 from balloon_sim.cells import keys
 from balloon_sim.config import BalloonConfig, BeliefConfig, PlannerConfig, TaskConfig, WindConfig
 from balloon_sim.controllers import fixed_plan, hindsight, mpc
@@ -86,14 +86,14 @@ def main(argv: list[str] | None = None) -> None:
     task = draw_task(task_config, k_task, truth)
 
     # the forecast is the truth under one error field; at sigma = 0 that field is zero and the two agree
-    believed = FixedBelief(belief_config, forecast(belief_config, k_noise, truth))
+    believed = GPBelief(belief_config, forecast(belief_config, k_noise, truth))
     n_moves, n_winds = task_config.n_moves, asked["n_winds"]
     if asked["controller"] == "hindsight":
         controller = hindsight(balloon, planner, truth, task.goal_lat, task.goal_lon, n_moves)
     elif asked["controller"] == "fixed_plan":
         controller = fixed_plan(balloon, planner, believed, task.goal_lat, task.goal_lon, n_moves, n_winds)
     else:
-        controller = mpc(balloon, planner, believed, task.goal_lat, task.goal_lon, n_winds)
+        controller = mpc(balloon, planner, believed, task.goal_lat, task.goal_lon, n_winds, n_moves)
 
     began = time.perf_counter()
     flight = fly(balloon, controller, truth, task.start, task.goal_lat, task.goal_lon, n_moves, k_fly)

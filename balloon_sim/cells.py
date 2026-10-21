@@ -29,13 +29,15 @@ class Cell(NamedTuple):
     n_winds: int
 
 
-def cells(experiment: ExperimentConfig, n_moves: int) -> list[Cell]:
-    """Every flight the sweep runs, with no two cells describing the same flight"""
+def cells(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> list[Cell]:
+    """Every flight the sweep runs, with no two cells describing the same flight. fitted_sigma is the record's
+    own day-old error (BeliefConfig.sigma); the sweep's levels are multiples of it"""
     out: list[Cell] = []
     for seed in experiment.seeds:
         if "hindsight" in experiment.controllers:
             out.append(Cell("hindsight", seed, 0.0, n_moves, 0))  # the truth, whatever sigma says
-        for sigma in experiment.sigmas:
+        for multiple in experiment.sigma_multiples:
+            sigma = round(multiple * fitted_sigma, 4)
             for n in experiment.n_winds:
                 if "fixed_plan" in experiment.controllers:
                     out.append(Cell("fixed_plan", seed, sigma, n_moves, n))

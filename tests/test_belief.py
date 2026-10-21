@@ -2,9 +2,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from balloon_sim.belief import FixedBelief, error_draws, forecast
+from balloon_sim.belief import GPBelief, Readings, error_draws, forecast
 from balloon_sim.config import BeliefConfig
-from balloon_sim.dynamics import distance_km
+from balloon_sim.dynamics import State, distance_km
 from balloon_sim.wind import WindField
 
 CONFIG = BeliefConfig(sigma=2.8)
@@ -61,12 +61,31 @@ def test_forecast_is_the_truth_less_an_error_of_size_sigma():
     assert abs(float(jnp.std(errors)) - CONFIG.sigma) < 0.1 * CONFIG.sigma
 
 
-def test_fixed_belief_gives_its_mean_or_draws_around_it():
+def test_unread_belief_gives_its_mean_or_draws_around_it():
     mean = grid(jnp.full((4, 4, 5, 5, 2), 7.0))
-    belief = FixedBelief(CONFIG, mean)
-    alone = belief.winds(jax.random.key(0), 0)
-    assert alone.uv.shape == (1, 4, 4, 5, 5, 2) and jnp.allclose(alone.uv, 7.0)
-    drawn = belief.winds(jax.random.key(0), 6)
+    belief, nothing = GPBelief(CONFIG, mean), Readings.empty(3)
+    alone = belief.winds(jax.random.key(0), 0, nothing)
+    assert alone.uv.shape == (1, 4, 4, 5, 5, 2) and jnp.allclose(alone.uv, 7.0, atol=1e-4)
+    drawn = belief.winds(jax.random.key(0), 6, nothing)
     assert drawn.uv.shape == (6, 4, 4, 5, 5, 2)
     assert not jnp.allclose(drawn.uv[0], drawn.uv[1])  # different draws differ
     assert jnp.allclose(drawn.hours, mean.hours)  # all on the mean's grid
+    assert abs(float(jnp.std(drawn.uv - 7.0)) - CONFIG.sigma) < 0.3  # still the prior's spread
+
+
+def test_a_reading_pins_the_mean_and_every_draw_there_and_fades_with_distance():
+    """At a read grid point the belief is the reading, exactly; far away it is still the forecast"""
+    mean = grid(jnp.full((4, 4, 5, 5, 2), 7.0))
+    here = State(LAT[2], LON[2], ALTITUDE[1], HOURS[1])  # a grid point, so the field there is one value
+    readings = Readings.empty(5).add(here, jnp.array([12.0, -3.0]))
+    belief = GPBelief(CONFIG, mean)
+    posterior_mean = belief.winds(jax.random.key(0), 0, readings).uv[0]
+    draws = belief.winds(jax.random.key(1), 4, readings).uv
+    at = (1, 1, 2, 2)  # (t, alt, lat, lon) of the reading
+    assert jnp.allclose(posterior_mean[at], jnp.array([12.0, -3.0]), atol=0.05)
+    assert jnp.allclose(draws[(slice(None), *at)], jnp.array([12.0, -3.0]), atol=0.05)
+    far = (3, 3, 0, 0)  # 48 h later, 5 km higher, 1,100 km away
+    assert jnp.allclose(posterior_mean[far], 7.0, atol=0.3)
+    # the pull is in the kernel's direction: a point 5 degrees north, same time and altitude, moves part of the way
+    near = (1, 1, 3, 2)
+    assert 7.5 < float(posterior_mean[near][0]) < 12.0

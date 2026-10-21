@@ -1,9 +1,11 @@
 """Fit the belief kernel's lengthscales and amplitude to a record's forecast error
 
+    uv run scripts/fit_kernel.py records/cbottle_jul_s100.npz --stale-hours 24
     uv run scripts/fit_kernel.py records/era5_npac_wide.npz
 
-A record carries both the true wind and the forecast of it, so the error the forecast actually makes is
-simply their difference. The belief's kernel is meant to describe that error, and its settings are zermelo's
+The error fitted is that of a day-old forecast: the truth as it was `--stale-hours` earlier, which any wind
+time series can supply (DESIGN.md, 26). Without the flag the record must carry its own forecast_u and
+forecast_v, and the error is their difference from the truth. The belief's kernel is meant to describe that error, and its settings are zermelo's
 hand-set numbers until this script replaces them with the record's own. It prints a BeliefConfig to paste.
 
     e = truth - forecast,   k(x, x') = sigma^2 * Matern52(place, altitude) * Matern32(time)
@@ -25,13 +27,20 @@ EARTH_RADIUS_KM = 6371.0
 LAGS = 12  # lags per axis: beyond this the curve is noise, since few pairs are that far apart
 
 
-def error(record) -> np.ndarray:
-    """The error the record's forecast makes, as (n_t, n_alt, n_lat, n_lon, 2). Missing forecast is fatal:
-    there is nothing to fit without it"""
-    missing = [k for k in ("u", "v", "forecast_u", "forecast_v") if k not in record]
+def error(record, stale_hours: float | None) -> np.ndarray:
+    """The error the forecast makes, as (n_t, n_alt, n_lat, n_lon, 2): against a forecast that is the truth
+    stale_hours earlier, or the record's own forecast when stale_hours is None"""
+    u, v = record["u"], record["v"]
+    if stale_hours is not None:
+        step = float(np.diff(record["hours"]).mean())
+        frames = int(round(stale_hours / step))
+        if frames < 1 or frames >= u.shape[0]:
+            raise SystemExit(f"{stale_hours} h is {frames} frames of {step:.0f} h; the record has {u.shape[0]}")
+        return np.stack([u[frames:] - u[:-frames], v[frames:] - v[:-frames]], axis=-1)  # truth now minus truth then
+    missing = [k for k in ("forecast_u", "forecast_v") if k not in record]
     if missing:
-        raise SystemExit(f"the record has no {', '.join(missing)}, so its forecast error cannot be measured")
-    return np.stack([record["u"] - record["forecast_u"], record["v"] - record["forecast_v"]], axis=-1)
+        raise SystemExit(f"the record has no {', '.join(missing)}: pass --stale-hours to build a forecast from the truth")
+    return np.stack([u - record["forecast_u"], v - record["forecast_v"]], axis=-1)
 
 
 def matern(distance: np.ndarray, lengthscale: float, nu: float) -> np.ndarray:
@@ -78,9 +87,9 @@ def lengthscale(correlations: np.ndarray, spacing: float, nu: float) -> float:
     return float(scan[int(np.argmin(loss))])
 
 
-def fit(path: str) -> dict:
+def fit(path: str, stale_hours: float | None = None) -> dict:
     record = np.load(path)
-    e = error(record)
+    e = error(record, stale_hours)
     hours, altitude_km = np.asarray(record["hours"], float), np.asarray(record["altitude_km"], float)
     lat, lon = np.asarray(record["latitude"], float), np.asarray(record["longitude"], float)
 
@@ -104,11 +113,12 @@ def fit(path: str) -> dict:
 
 def main(argv: list[str] | None = None) -> None:
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ask.add_argument("record", help="the .npz to fit, which must carry forecast_u and forecast_v")
+    ask.add_argument("record", help="the .npz to fit")
+    ask.add_argument("--stale-hours", type=float, default=None, help="fit the error of the truth this many hours earlier")
     ask.add_argument("--json", default=None, help="also write the fit to this file")
     asked = ask.parse_args(argv)
 
-    fitted = fit(asked.record)
+    fitted = fit(asked.record, asked.stale_hours)
     print(f"{Path(asked.record).name}: error {fitted['sigma']:.3f} m/s "
           f"(u {fitted['sigma_u']:.3f}, v {fitted['sigma_v']:.3f})")
     print(f"  horizontal {fitted['horizontal_km']:.0f} km "

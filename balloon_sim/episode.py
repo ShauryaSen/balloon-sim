@@ -1,10 +1,11 @@
 """Fly one controller in the true wind and return its trajectory and metrics"""
 
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 
+from balloon_sim.belief import read
 from balloon_sim.config import BalloonConfig
 from balloon_sim.controllers import Controller
 from balloon_sim.dynamics import State, clip, final_cost, step, summed_cost
@@ -28,13 +29,14 @@ def fly(
     n_moves: int,
     key: jax.Array,
 ) -> Flight:
-    """The simulator: each move, the controller picks a climb, the balloon moves in the true wind, and is clipped"""
+    """The simulator: each move, the balloon reads the true wind where it is, the controller picks a climb, the
+    balloon moves in the true wind, and is held inside the record's latitudes"""
     k_begin, k_moves = jax.random.split(key)
 
-    def one_move(carry: tuple[State, jax.Array], inputs: tuple[jax.Array, jax.Array]):
+    def one_move(carry: tuple[State, Any], inputs: tuple[jax.Array, jax.Array]):
         state, memory = carry
         move, k = inputs
-        climb, memory = controller.act(memory, k, state, move)
+        climb, memory = controller.act(memory, k, state, move, read(truth, state))
         state = clip(truth, step(truth, state, climb, balloon.step_hours, balloon.substeps))
         return (state, memory), (climb, state)
 

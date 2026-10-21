@@ -24,7 +24,7 @@ def field(u_low: float, u_high: float) -> WindField:
 
 def coast() -> Controller:
     """Never climbs: the baseline every planner should beat"""
-    return Controller(lambda key, state: jnp.zeros(()), lambda memory, key, state, move: (jnp.zeros(()), memory))
+    return Controller(lambda key, state: jnp.zeros(()), lambda memory, key, state, move, reading: (jnp.zeros(()), memory))
 
 
 def test_still_air_goes_nowhere():

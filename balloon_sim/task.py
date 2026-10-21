@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from balloon_sim.config import TaskConfig
 from balloon_sim.dynamics import EARTH_RADIUS_M, State
-from balloon_sim.wind import WindField
+from balloon_sim.wind import WindField, is_global
 
 
 class Task(NamedTuple):
@@ -34,16 +34,21 @@ def draw_task(config: TaskConfig, key: jax.Array, truth: WindField) -> Task:
         start = State(jnp.array(config.start_lat), jnp.array(config.start_lon), middle_km, jnp.array(config.start_hours))
         return Task(start, jnp.array(config.goal_lat), jnp.array(config.goal_lon))
 
-    # random mode: draw many tries at once, keep the first whose goal also lands inside the box
+    # random mode: draw many tries at once, keep the first whose goal also lands inside the allowed area.
+    # Latitude is limited to +-lat_limit_deg and to the record's own latitudes less the margin; longitude is
+    # limited to the record's less the margin, or not at all when the record goes round the globe
     m = config.margin_deg
+    lat_low, lat_high = max(float(truth.lat[0]) + m, -config.lat_limit_deg), min(float(truth.lat[-1]) - m, config.lat_limit_deg)
+    lon_low, lon_high = (0.0, 360.0) if is_global(truth.lon) else (float(truth.lon[0]) + m, float(truth.lon[-1]) - m)
     k_lat, k_lon, k_bearing = jax.random.split(key, 3)
     tries = 1000
-    lat = jax.random.uniform(k_lat, (tries,), minval=truth.lat[0] + m, maxval=truth.lat[-1] - m)
-    lon = jax.random.uniform(k_lon, (tries,), minval=truth.lon[0] + m, maxval=truth.lon[-1] - m)
+    lat = jax.random.uniform(k_lat, (tries,), minval=lat_low, maxval=lat_high)
+    lon = jax.random.uniform(k_lon, (tries,), minval=lon_low, maxval=lon_high)
     goal_lat, goal_lon = _destination(lat, lon, jax.random.uniform(k_bearing, (tries,), maxval=2 * jnp.pi), config.distance_km)
-    inside = (goal_lat >= truth.lat[0] + m) & (goal_lat <= truth.lat[-1] - m) & (goal_lon >= truth.lon[0] + m) & (goal_lon <= truth.lon[-1] - m)
+    goal_lon = goal_lon % 360.0
+    inside = (goal_lat >= lat_low) & (goal_lat <= lat_high) & (goal_lon >= lon_low) & (goal_lon <= lon_high)
     if not bool(inside.any()):
-        raise ValueError(f"no goal {config.distance_km} km away fits inside the box with a {m} degree margin")
+        raise ValueError(f"no goal {config.distance_km} km away fits inside the allowed area")
     i = jnp.argmax(inside)  # the first try that fits
     start = State(lat[i], lon[i], middle_km, jnp.array(config.start_hours))
     return Task(start, goal_lat[i], goal_lon[i])

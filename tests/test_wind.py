@@ -51,3 +51,14 @@ def test_load_record_makes_altitude_ascending(tmp_path):
     field = load_record(str(path))
     assert jnp.all(jnp.diff(field.altitude_km) > 0)
     assert jnp.allclose(field.uv[:, 0, :, :, 0], u[:, -1], atol=1e-6)  # the lowest level is the file's last
+
+
+def test_a_global_record_blends_across_the_seam(tmp_path):
+    """Longitude 0 to 358 by 2: reading at 359 blends the last column with the first, and 361 reads as 1"""
+    lon = np.arange(0.0, 360.0, 2.0)
+    u = np.zeros((2, 2, 2, len(lon))) + lon[None, None, None, :]  # u equals the longitude
+    np.savez(tmp_path / "global.npz", hours=[0.0, 6.0], altitude_km=[15.0, 20.0], latitude=[0.0, 10.0], longitude=lon, u=u, v=0 * u)
+    field = load_record(str(tmp_path / "global.npz"))
+    assert field.lon.shape[0] == len(lon) + 1 and field.lon[-1] == 360.0
+    assert jnp.allclose(wind_at(field, 5.0, 359.0, 15.0, 0.0)[0], (358.0 + 0.0) / 2, atol=1e-3)  # halfway round the seam
+    assert jnp.allclose(wind_at(field, 5.0, 361.0, 15.0, 0.0)[0], wind_at(field, 5.0, 1.0, 15.0, 0.0)[0], atol=1e-3)

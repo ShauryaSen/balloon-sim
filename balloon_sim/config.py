@@ -6,9 +6,9 @@ from typing import Literal
 
 @dataclass(frozen=True)
 class BalloonConfig:
-    step_hours: float = 3.0  # one move
+    step_hours: float = 6.0  # one move: a cBottle frame
     substeps: int = 1  # Euler pieces per move
-    climb_cap_km: float = 1.1  # the most the balloon can climb or sink in one move
+    climb_cap_km: float = 2.2  # the most the balloon can climb or sink in one move (1.1 km per 3 h)
 
 
 @dataclass(frozen=True)
@@ -27,13 +27,15 @@ class PlannerConfig:
 @dataclass(frozen=True)
 class BeliefConfig:
     """The kernel shared by the forecast's error and the belief, so the belief is calibrated by construction.
-    Lengthscales are zermelo's hand-set values until scripts/fit_kernel.py fits them to a record"""
+    Fitted by scripts/fit_kernel.py to the error of a day-old forecast on records/cbottle_jul_s100.npz
+    (`--stale-hours 24`); the ERA5 wide record gave 2.8 m/s, 544 km, 1.2 km, 9.4 h"""
 
-    sigma: float = 2.8  # m/s per wind component: the size of the forecast's error, the swept noise level
-    horizontal_km: float = 800.0  # how far apart two places can be and still have related errors
-    altitude_km: float = 3.3  # the same, between altitudes (zermelo's 3 levels, about 1.1 km apart)
-    hours: float = 24.0  # the same, between times
+    sigma: float = 5.9  # m/s per wind component: the size of the forecast's error, the swept noise level
+    horizontal_km: float = 578.0  # how far apart two places can be and still have related errors
+    altitude_km: float = 4.4  # the same, between altitudes (two levels 8.8 km apart: a one-lag fit)
+    hours: float = 9.9  # the same, between times
     n_features: int = 256  # random Fourier features per draw: more is closer to the exact kernel, but slower
+    reading_noise: float = 0.01  # m/s the belief assumes a reading is off by: zermelo's jitter, not a real error
 
 
 @dataclass(frozen=True)
@@ -41,11 +43,12 @@ class TaskConfig:
     """Where an episode starts and where its goal is (decision 18)"""
 
     mode: Literal["random", "fixed"] = "random"
-    n_moves: int = 80  # length of an episode
+    n_moves: int = 50  # length of an episode: 50 six-hour moves is 12.5 days of a 14-day cBottle rollout
     start_hours: float = 0.0  # when in the record the episode starts
-    # random mode: a start drawn inside the box, the goal distance_km away in a random direction
+    # random mode: a start drawn inside the allowed area, the goal distance_km away in a random direction
     distance_km: float = 1000.0
-    margin_deg: float = 3.0  # start and goal at least this far inside the box's edges
+    margin_deg: float = 3.0  # start and goal at least this far inside a regional record's edges
+    lat_limit_deg: float = 60.0  # start and goal no further poleward than this, on a global record
     # fixed mode: these exact coordinates
     start_lat: float | None = None
     start_lon: float | None = None
@@ -57,7 +60,7 @@ class TaskConfig:
 class WindConfig:
     """Which record an episode flies in"""
 
-    path: str = "records/era5_npac_wide.npz"  # a .npz holding u, v, hours, altitude_km, latitude, longitude
+    path: str = "records/cbottle_jul_s100.npz"  # a .npz holding u, v, hours, altitude_km, latitude, longitude
 
 
 @dataclass(frozen=True)
@@ -70,10 +73,11 @@ class ExperimentConfig:
     """
 
     seeds: tuple[int, ...] = tuple(range(32))
-    sigmas: tuple[float, ...] = (0.0, 0.7, 1.4, 2.8, 5.6, 11.2)
-    """Forecast error in m/s per component. 2.8 is the record's own, so the ladder is 0, a quarter, a half,
-    one, two and four times a real 24 h forecast. Denser below the real error than above it, because the
-    zermelo sweep found performance flat up to about half of it and falling smoothly after"""
+    sigma_multiples: tuple[float, ...] = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0)
+    """Forecast error as a multiple of BeliefConfig.sigma, the record's own day-old error, so the ladder is 0,
+    a quarter, a half, one, two and four times a real 24 h forecast whatever record is flown. Denser below the
+    real error than above it, because the zermelo sweep found performance flat up to about half of it and
+    falling smoothly after"""
 
     horizons: tuple[int, ...] = (10, 20, 40)  # moves the MPC plans ahead
     n_winds: tuple[int, ...] = (0, 8)  # belief draws a plan is averaged over; 0 is the belief's mean alone

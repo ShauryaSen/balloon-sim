@@ -87,3 +87,9 @@ def test_step_holds_altitude_inside_the_levels():
     field = uniform_field(0.0, 0.0)
     assert jnp.allclose(step(field, start(), jnp.array(5.0), STEP_HOURS).altitude_km, 20.0)
     assert jnp.allclose(step(field, start(), jnp.array(-5.0), STEP_HOURS).altitude_km, 15.0)
+
+
+def test_longitude_wraps_round_the_globe():
+    """A balloon at 359.9E blown east comes out just past 0E, not at 360-something"""
+    after = step(uniform_field(50.0, 0.0), State(jnp.array(0.0), jnp.array(359.9), jnp.array(17.0), jnp.array(0.0)), jnp.array(0.0), STEP_HOURS)
+    assert 0.0 <= after.lon < 10.0

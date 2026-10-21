@@ -22,7 +22,7 @@ def step(field: WindField, state: State, climb_km: jax.Array, step_hours: float,
 
     Each substep reads the wind once at its start and moves in a straight line (Euler):
         lat += v dt / R
-        lon += u dt / (R cos lat)
+        lon += u dt / (R cos lat), wrapped round at 360
         altitude += climb_km / substeps, then held inside the record's levels
     Altitude is held here, so the planner and the simulator agree on it exactly; past the floor or ceiling a climb
     has no effect and no gradient. Position is not held here, so the planner's gradient never dies at the box's
@@ -35,7 +35,7 @@ def step(field: WindField, state: State, climb_km: jax.Array, step_hours: float,
         dlon = jnp.degrees(u * dt_s / (EARTH_RADIUS_M * jnp.cos(jnp.radians(state.lat))))
         state = State(
             state.lat + dlat,
-            state.lon + dlon,
+            (state.lon + dlon) % 360.0,  # round the globe
             jnp.clip(state.altitude_km + climb_km / substeps, field.altitude_km[0], field.altitude_km[-1]),
             state.hours + step_hours / substeps,
         )

@@ -38,3 +38,16 @@ def test_fixed_mode_without_coordinates_is_an_error():
 def test_a_goal_too_far_for_the_box_is_an_error():
     with pytest.raises(ValueError):
         draw_task(TaskConfig(distance_km=20_000.0), jax.random.key(0), TRUTH)
+
+
+def test_on_a_global_record_the_goal_may_cross_the_seam_but_stays_within_the_latitude_limit():
+    lon = jnp.arange(0.0, 360.0, 2.0)
+    globe = WindField(jnp.array([0.0, 240.0]), jnp.array([11.8, 20.6]), jnp.arange(-80.0, 81.0, 2.0), lon, jnp.zeros((2, 2, 81, 180, 2)))
+    seen_near_seam = False
+    for seed in range(60):
+        task = draw_task(TaskConfig(), jax.random.key(seed), globe)
+        assert -60.0 <= task.start.lat <= 60.0 and -60.0 <= task.goal_lat <= 60.0
+        assert 0.0 <= task.goal_lon < 360.0
+        assert jnp.allclose(distance_km(task.start.lat, task.start.lon, task.goal_lat, task.goal_lon), 1000.0, atol=1.0)
+        seen_near_seam |= bool((task.start.lon > 350.0) | (task.start.lon < 10.0))
+    assert seen_near_seam  # starts near the seam are allowed, nothing is reserved as a margin
