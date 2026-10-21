@@ -84,5 +84,15 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
 24. **Build order.** wind, dynamics, planner, hindsight end to end, belief with fixed plan and MPC, scripts. Each
     step tested before the next.
 
+25. **The belief learns before the sweep runs.** At each move the balloon reads the wind where it is and the belief
+    conditions on it (pathwise update of the random Fourier draws), so MPC plans on what it has learned. Hindsight
+    and the fixed plan do not learn: one knows the truth, the other never looks.
+26. **Kernel fitted to the wind itself, not to the record's stale forecast.** The error is taken to be shaped like
+    real weather (the wind minus its mean at each level); only the lengthscales are used, since sigma is swept.
+27. **Both metrics plotted**, summed and final distance; which one leads is Sarah's call.
+
 ## Open
 
+- Edges: go global so there is no box. Global ERA5 keeps the 14.8 to 20.2 km levels; global cBottle has only
+  11.8, 20.6 and 31 km near the flight band. Needs longitude wrapping at 0/360 and a pole limit either way.
+- What a reading is (the wind at the balloon's point, or its whole column) and how noisy it is.
