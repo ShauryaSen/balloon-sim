@@ -35,10 +35,10 @@ def draw_task(config: TaskConfig, key: jax.Array, truth: WindField) -> Task:
         return Task(start, jnp.array(config.goal_lat), jnp.array(config.goal_lon))
 
     # random mode: draw many tries at once, keep the first whose goal also lands inside the allowed area.
-    # Latitude is limited to +-lat_limit_deg and to the record's own latitudes less the margin; longitude is
-    # limited to the record's less the margin, or not at all when the record goes round the globe
+    # Latitude is limited to the band and to the record's own latitudes less the margin; longitude is limited
+    # to the record's less the margin, or not at all when the record goes round the globe
     m = config.margin_deg
-    lat_low, lat_high = max(float(truth.lat[0]) + m, -config.lat_limit_deg), min(float(truth.lat[-1]) - m, config.lat_limit_deg)
+    lat_low, lat_high = max(float(truth.lat[0]) + m, config.lat_band[0]), min(float(truth.lat[-1]) - m, config.lat_band[1])
     lon_low, lon_high = (0.0, 360.0) if is_global(truth.lon) else (float(truth.lon[0]) + m, float(truth.lon[-1]) - m)
     k_lat, k_lon, k_bearing = jax.random.split(key, 3)
     tries = 1000

@@ -114,9 +114,25 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
 31. **Only the moves left in the episode count in a plan.** MPC near the end would otherwise optimise moves
     it never flies, in wind frozen at the record's last frame, more so the longer the horizon.
 
+32. **Wind: a global ERA5 record at the balloon's six levels** (`era5_global_jul2021.npz`: 2021-07-16 for
+    240 h at 3 h, 2 degrees, 80S to 80N, 14.8 to 20.2 km), built by `balloon-env-dev/unicorn/make_zermelo_record.py`
+    with a global box. Replaces released cBottle after one sweep: with only 11.8 and 20.6 km in the band,
+    both at jet speeds, no controller could hold position and the experiment measured drift; every cBottle
+    number is in `docs/cbottle-2026-10-21.md`. Global, so there is still no box edge. cBottle returns through
+    Shaurya's retrained 18-level generator once time-stitching exists. Moves are back to 3 h with a 1.1 km cap;
+    an episode is still 50 moves.
+33. **Launches in the summer mid-latitudes, 20N to 50N**, the goal 300 km downwind. Where the balloon
+    launches decides whether any controller can hold: a seed in the southern winter jet (35 m/s at every level)
+    drifts 7,000 km under hindsight. The band matches the North Pacific record the lab already used, and the
+    kernel is fitted within it (3.2 m/s, 544 km, 1.3 km, 9.1 h).
+34. **Hindsight replans on the truth** (replacing the one plan flown blind), and **refinement keeps the best
+    iterate**: one solve from a random pool left MPC on a perfect forecast beating hindsight by a tenth, and
+    L-BFGS's line search could wander uphill and hand back a worse plan than it started from. Both found by the
+    first sweep. L-BFGS beat Myles's normalised descent on 7 of 8 ERA5 seeds and random search on all 8, so the
+    optimiser is not what limits the controllers.
+
 ## Open
 
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.
-- Goal distance: 1,000 km is one or two moves at jet speed; the reachability check over seeds decides.
 - Myles's normalised descent stalls under the 6 h move (about twice L-BFGS's cost on the test wind); it stays
   as the option it is, not the default.

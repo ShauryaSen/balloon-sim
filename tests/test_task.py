@@ -12,7 +12,7 @@ TRUTH = WindField(jnp.array([0.0, 240.0]), jnp.array([15.0, 20.0]), jnp.array([2
 
 def test_random_goal_is_the_right_distance_away_and_inside_the_box():
     for seed in range(20):
-        task = draw_task(TaskConfig(), jax.random.key(seed), TRUTH)
+        task = draw_task(TaskConfig(direction="random", distance_km=1000.0), jax.random.key(seed), TRUTH)
         assert jnp.allclose(distance_km(task.start.lat, task.start.lon, task.goal_lat, task.goal_lon), 1000.0, atol=1.0)
         for lat, lon in [(task.start.lat, task.start.lon), (task.goal_lat, task.goal_lon)]:
             assert 23.0 <= lat <= 47.0 and 123.0 <= lon <= 237.0  # inside the 3 degree margin
@@ -20,7 +20,7 @@ def test_random_goal_is_the_right_distance_away_and_inside_the_box():
 
 
 def test_random_tasks_differ_by_seed():
-    a, b = draw_task(TaskConfig(), jax.random.key(0), TRUTH), draw_task(TaskConfig(), jax.random.key(1), TRUTH)
+    a, b = draw_task(TaskConfig(direction="random"), jax.random.key(0), TRUTH), draw_task(TaskConfig(direction="random"), jax.random.key(1), TRUTH)
     assert a.start.lat != b.start.lat
 
 
@@ -37,15 +37,15 @@ def test_fixed_mode_without_coordinates_is_an_error():
 
 def test_a_goal_too_far_for_the_box_is_an_error():
     with pytest.raises(ValueError):
-        draw_task(TaskConfig(distance_km=20_000.0), jax.random.key(0), TRUTH)
+        draw_task(TaskConfig(direction="random", distance_km=20_000.0), jax.random.key(0), TRUTH)
 
 
-def test_on_a_global_record_the_goal_may_cross_the_seam_but_stays_within_the_latitude_limit():
+def test_on_a_global_record_the_goal_may_cross_the_seam_but_stays_within_the_latitude_band():
     lon = jnp.arange(0.0, 360.0, 2.0)
     globe = WindField(jnp.array([0.0, 240.0]), jnp.array([11.8, 20.6]), jnp.arange(-80.0, 81.0, 2.0), lon, jnp.zeros((2, 2, 81, 180, 2)))
     seen_near_seam = False
     for seed in range(60):
-        task = draw_task(TaskConfig(), jax.random.key(seed), globe)
+        task = draw_task(TaskConfig(direction="random", distance_km=1000.0, lat_band=(-60.0, 60.0)), jax.random.key(seed), globe)
         assert -60.0 <= task.start.lat <= 60.0 and -60.0 <= task.goal_lat <= 60.0
         assert 0.0 <= task.goal_lon < 360.0
         assert jnp.allclose(distance_km(task.start.lat, task.start.lon, task.goal_lat, task.goal_lon), 1000.0, atol=1.0)
@@ -61,3 +61,9 @@ def test_a_downwind_goal_lies_where_the_wind_blows():
         task = draw_task(TaskConfig(direction="downwind"), jax.random.key(seed), east)
         assert jnp.allclose(task.goal_lat, task.start.lat, atol=1.0)  # due east: a great circle bends half a degree equatorward over 1,000 km
         assert task.goal_lon > task.start.lon
+
+
+def test_launches_stay_in_the_latitude_band():
+    for seed in range(20):
+        task = draw_task(TaskConfig(), jax.random.key(seed), TRUTH)
+        assert 20.0 <= task.start.lat <= 50.0 and 20.0 <= task.goal_lat <= 50.0

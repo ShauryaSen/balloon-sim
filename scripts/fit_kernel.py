@@ -87,11 +87,14 @@ def lengthscale(correlations: np.ndarray, spacing: float, nu: float) -> float:
     return float(scan[int(np.argmin(loss))])
 
 
-def fit(path: str, stale_hours: float | None = None) -> dict:
+def fit(path: str, stale_hours: float | None = None, lat_band: tuple[float, float] | None = None) -> dict:
     record = np.load(path)
     e = error(record, stale_hours)
     hours, altitude_km = np.asarray(record["hours"], float), np.asarray(record["altitude_km"], float)
     lat, lon = np.asarray(record["latitude"], float), np.asarray(record["longitude"], float)
+    if lat_band is not None:  # fit where the balloon flies, not the whole globe
+        keep = (lat >= lat_band[0]) & (lat <= lat_band[1])
+        lat, e = lat[keep], e[:, :, keep]
 
     # Horizontal spacing in km, measured at the middle of the record. A degree of longitude shrinks with
     # latitude while a degree of latitude does not, so the two axes are fitted separately and then pooled:
@@ -115,10 +118,11 @@ def main(argv: list[str] | None = None) -> None:
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ask.add_argument("record", help="the .npz to fit")
     ask.add_argument("--stale-hours", type=float, default=None, help="fit the error of the truth this many hours earlier")
+    ask.add_argument("--lat", type=float, nargs=2, default=None, metavar=("LOW", "HIGH"), help="fit within this latitude band only")
     ask.add_argument("--json", default=None, help="also write the fit to this file")
     asked = ask.parse_args(argv)
 
-    fitted = fit(asked.record, asked.stale_hours)
+    fitted = fit(asked.record, asked.stale_hours, tuple(asked.lat) if asked.lat else None)
     print(f"{Path(asked.record).name}: error {fitted['sigma']:.3f} m/s "
           f"(u {fitted['sigma_u']:.3f}, v {fitted['sigma_v']:.3f})")
     print(f"  horizontal {fitted['horizontal_km']:.0f} km "

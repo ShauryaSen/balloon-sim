@@ -6,9 +6,9 @@ from typing import Literal
 
 @dataclass(frozen=True)
 class BalloonConfig:
-    step_hours: float = 6.0  # one move: a cBottle frame
+    step_hours: float = 3.0  # one move: an ERA5 frame
     substeps: int = 1  # Euler pieces per move
-    climb_cap_km: float = 2.2  # the most the balloon can climb or sink in one move (1.1 km per 3 h)
+    climb_cap_km: float = 1.1  # the most the balloon can climb or sink in one move
 
 
 @dataclass(frozen=True)
@@ -27,13 +27,14 @@ class PlannerConfig:
 @dataclass(frozen=True)
 class BeliefConfig:
     """The kernel shared by the forecast's error and the belief, so the belief is calibrated by construction.
-    Fitted by scripts/fit_kernel.py to the error of a day-old forecast on records/cbottle_jul_s100.npz
-    (`--stale-hours 24`); the ERA5 wide record gave 2.8 m/s, 544 km, 1.2 km, 9.4 h"""
+    Fitted by scripts/fit_kernel.py to the error of a day-old forecast on records/era5_global_jul2021.npz
+    between 20N and 50N, where the balloon flies (`--stale-hours 24 --lat 20 50`). The North Pacific box gave
+    2.8 m/s, 544 km, 1.2 km, 9.4 h; cBottle gave 5.9, 578, 4.4, 9.9 (docs/cbottle-2026-10-21.md)"""
 
-    sigma: float = 5.9  # m/s per wind component: the size of the forecast's error, the swept noise level
-    horizontal_km: float = 578.0  # how far apart two places can be and still have related errors
-    altitude_km: float = 4.4  # the same, between altitudes (two levels 8.8 km apart: a one-lag fit)
-    hours: float = 9.9  # the same, between times
+    sigma: float = 3.2  # m/s per wind component: the size of the forecast's error, the swept noise level
+    horizontal_km: float = 544.0  # how far apart two places can be and still have related errors
+    altitude_km: float = 1.3  # the same, between altitudes
+    hours: float = 9.1  # the same, between times
     n_features: int = 256  # random Fourier features per draw: more is closer to the exact kernel, but slower
     reading_noise: float = 0.01  # m/s the belief assumes a reading is off by: zermelo's jitter, not a real error
 
@@ -43,13 +44,13 @@ class TaskConfig:
     """Where an episode starts and where its goal is (decision 18)"""
 
     mode: Literal["random", "fixed"] = "random"
-    n_moves: int = 50  # length of an episode: 50 six-hour moves is 12.5 days of a 14-day cBottle rollout
+    n_moves: int = 50  # length of an episode: 50 three-hour moves is 6.25 days of the 10-day record
     start_hours: float = 0.0  # when in the record the episode starts
     # random mode: a start drawn inside the allowed area, the goal distance_km away in a random direction
-    distance_km: float = 1000.0
-    direction: Literal["random", "downwind"] = "random"  # the goal's bearing: any, or where the start's wind blows
+    distance_km: float = 300.0
+    direction: Literal["random", "downwind"] = "downwind"  # the goal's bearing: any, or where the start's wind blows
     margin_deg: float = 3.0  # start and goal at least this far inside a regional record's edges
-    lat_limit_deg: float = 60.0  # start and goal no further poleward than this, on a global record
+    lat_band: tuple[float, float] = (20.0, 50.0)  # launches and goals within these latitudes: summer mid-latitudes
     # fixed mode: these exact coordinates
     start_lat: float | None = None
     start_lon: float | None = None
@@ -61,7 +62,7 @@ class TaskConfig:
 class WindConfig:
     """Which record an episode flies in"""
 
-    path: str = "records/cbottle_jul_s100.npz"  # a .npz holding u, v, hours, altitude_km, latitude, longitude
+    path: str = "records/era5_global_jul2021.npz"  # a .npz holding u, v, hours, altitude_km, latitude, longitude
 
 
 @dataclass(frozen=True)
