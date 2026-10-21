@@ -87,12 +87,19 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
 25. **The belief learns before the sweep runs.** At each move the balloon reads the wind where it is and the belief
     conditions on it (pathwise update of the random Fourier draws), so MPC plans on what it has learned. Hindsight
     and the fixed plan do not learn: one knows the truth, the other never looks.
-26. **Kernel fitted to the wind itself, not to the record's stale forecast.** The error is taken to be shaped like
-    real weather (the wind minus its mean at each level); only the lengthscales are used, since sigma is swept.
+26. **Kernel fitted to the record's stale forecast** (truth minus the truth 24 h earlier) as the headline: errors
+    shaped like a day-old forecast's. On the ERA5 wide record that gives 544 km, 1.18 km in altitude, 9.4 h,
+    2.79 m/s, against 1,013 km, 3.54 km, 58 h when fitted to the wind itself. A stale forecast can be built from any
+    time series, so the same fit works on cBottle.
 27. **Both metrics plotted**, summed and final distance; which one leads is Sarah's call.
+28. **cBottle is the wind source**, global, so there is no box edge (Sarah's call to use cBottle). Needs longitude
+    wrapping at 0/360 and a latitude limit away from the poles.
 
 ## Open
 
-- Edges: go global so there is no box. Global ERA5 keeps the 14.8 to 20.2 km levels; global cBottle has only
-  11.8, 20.6 and 31 km near the flight band. Needs longitude wrapping at 0/360 and a pole limit either way.
-- What a reading is (the wind at the balloon's point, or its whole column) and how noisy it is.
+- Which cBottle: the released cBottle-video (global, 14-day rollouts, but only 11.8, 20.6 and 31 km near the
+  flight band) or Shaurya's retrained two-stage generator (18 levels, 14.3 to 20.2 km, but 48 h blocks until
+  time-stitching is built).
+- With released cBottle, the altitude range the balloon may use.
+- What a reading is (the balloon's point or its whole column) and how noisy it is.
+- The normalised score near sigma = 0, where the gap it divides by is close to zero.
