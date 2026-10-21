@@ -5,7 +5,8 @@
 
 One array task runs one cell, so a failure loses one flight rather than the sweep. The task's index picks its
 line out of a cell list written beside the results, which keeps the sbatch script short and lets a failed
-subset be resubmitted by hand.
+subset be resubmitted by hand. Slurm caps an array at 1,001 tasks, so the list is submitted as arrays of
+1,000, each starting at its own offset into the one list.
 
 No --account is passed. Naming an account the submitter is not associated with is refused outright, while
 naming none charges their own default association, which is what an interactive job already does. The
@@ -30,14 +31,18 @@ ARRAY = """#!/bin/bash
 #SBATCH --mem={mem_gb}G
 #SBATCH --time={minutes}
 #SBATCH --array=0-{last}%{at_once}
-#SBATCH --output={logs}/%a.out
-#SBATCH --error={logs}/%a.out
+#SBATCH --output={logs}/{offset}-%a.out
+#SBATCH --error={logs}/{offset}-%a.out
 
 set -euo pipefail
 cd {root}
-CELL=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" {list})
+CELL=$(sed -n "$(({offset} + SLURM_ARRAY_TASK_ID + 1))p" {list})
 uv run scripts/run_cell.py $CELL --out {out}
 """
+
+
+ARRAY_LIMIT = 1000
+"""Tasks per array: Slurm's MaxArraySize on Unicorn is 1,001"""
 
 
 def flags(cell) -> str:
@@ -77,12 +82,15 @@ def main(argv: list[str] | None = None) -> None:
     listing.write_text("\n".join(lines) + "\n")
     (runs / "cells.json").write_text(json.dumps([cell._asdict() for cell in grid], indent=1))
 
-    script = runs / "array.sh"
-    script.write_text(ARRAY.format(
-        name=asked.name, partition=asked.partition, cpus=asked.cpus, mem_gb=asked.mem_gb, minutes=asked.minutes,
-        last=len(grid) - 1, at_once=asked.at_once, logs=logs, root=root, list=listing, out=asked.out,
-    ))
-    print(subprocess.run(["sbatch", str(script)], check=True, capture_output=True, text=True).stdout.strip())
+    for offset in range(0, len(grid), ARRAY_LIMIT):
+        chunk = min(ARRAY_LIMIT, len(grid) - offset)
+        script = runs / f"array-{offset}.sh"
+        script.write_text(ARRAY.format(
+            name=asked.name, partition=asked.partition, cpus=asked.cpus, mem_gb=asked.mem_gb, minutes=asked.minutes,
+            last=chunk - 1, at_once=asked.at_once, logs=logs, root=root, list=listing, out=asked.out, offset=offset,
+        ))
+        submitted = subprocess.run(["sbatch", str(script)], check=True, capture_output=True, text=True).stdout.strip()
+        print(f"cells {offset}-{offset + chunk - 1}: {submitted}")
 
 
 if __name__ == "__main__":
