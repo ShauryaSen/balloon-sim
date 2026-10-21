@@ -47,6 +47,7 @@ class TaskConfig:
     start_hours: float = 0.0  # when in the record the episode starts
     # random mode: a start drawn inside the allowed area, the goal distance_km away in a random direction
     distance_km: float = 1000.0
+    direction: Literal["random", "downwind"] = "random"  # the goal's bearing: any, or where the start's wind blows
     margin_deg: float = 3.0  # start and goal at least this far inside a regional record's edges
     lat_limit_deg: float = 60.0  # start and goal no further poleward than this, on a global record
     # fixed mode: these exact coordinates

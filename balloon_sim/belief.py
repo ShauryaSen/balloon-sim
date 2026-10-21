@@ -180,6 +180,15 @@ def _mean_at(mean: WindField, readings: Readings) -> jax.Array:
     return jax.vmap(lambda la, lo, al, h: wind_at(mean, la, lo, al, h))(readings.lat, readings.lon, readings.altitude_km, readings.hours)
 
 
+class Truth(NamedTuple):
+    """The true wind as a belief: what hindsight plans on. Draws and readings mean nothing to it"""
+
+    field: WindField
+
+    def winds(self, key: jax.Array, n: int, readings: Readings) -> WindField:
+        return self.field._replace(uv=self.field.uv[None])
+
+
 class GPBelief(NamedTuple):
     """The GP: the forecast as its mean, the shared kernel around it, conditioned on whatever readings it is given"""
 

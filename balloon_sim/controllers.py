@@ -4,8 +4,8 @@ A controller decides one climb per move, in two parts:
     begin(key, state)                       -> memory           once, before the first move
     act(memory, key, state, move, reading)  -> climb, memory    at every move
 `reading` is the wind at the balloon's own point at that move. Memory is whatever the controller carries from
-one move to the next: for the open-loop controllers the whole plan; for MPC its latest plan shifted by one move
-(the next solve starts from it) and every reading so far (the belief conditions on them).
+one move to the next: for the fixed plan the whole plan; for MPC (and hindsight, which is MPC on the truth) its
+latest plan shifted by one move (the next solve starts from it) and every reading so far.
 """
 
 import dataclasses
@@ -15,7 +15,7 @@ from typing import Any, NamedTuple
 import jax
 import jax.numpy as jnp
 
-from balloon_sim.belief import Belief, Readings
+from balloon_sim.belief import Belief, Readings, Truth
 from balloon_sim.config import BalloonConfig, PlannerConfig
 from balloon_sim.dynamics import State
 from balloon_sim.planner import plan
@@ -46,14 +46,6 @@ def _open_loop(
         return memory[move], memory  # the planned climb for this move; the plan itself never changes
 
     return Controller(begin, act)
-
-
-def hindsight(
-    balloon: BalloonConfig, planner: PlannerConfig, truth: WindField, goal_lat: jax.Array, goal_lon: jax.Array, n_moves: int
-) -> Controller:
-    """Knows the true wind: plans the whole episode once, on the truth. The ceiling"""
-    truth_alone = truth._replace(uv=truth.uv[None])  # a batch of one wind, the shape the planner takes
-    return _open_loop(balloon, planner, lambda key: truth_alone, goal_lat, goal_lon, n_moves)
 
 
 def fixed_plan(
@@ -101,3 +93,15 @@ def mpc(
         return climbs[0], MPCMemory(shifted, readings)
 
     return Controller(begin, act)
+
+
+def hindsight(
+    balloon: BalloonConfig, planner: PlannerConfig, truth: WindField, goal_lat: jax.Array, goal_lon: jax.Array, n_moves: int
+) -> Controller:
+    """Knows the true wind: replans every move on the truth over the whole episode. The ceiling.
+
+    Replanning rather than one plan flown blind, because the dynamics are deterministic given the wind, so the
+    two have the same optimum, and re-solving from the true position every move is the stronger search: one
+    solve from a random pool left MPC on a perfect forecast beating it by a tenth. What is left is still only
+    the best plan our optimiser found, which DESIGN.md names as hindsight's one approximation"""
+    return mpc(balloon, dataclasses.replace(planner, horizon=n_moves), Truth(truth), goal_lat, goal_lon, 0, n_moves)

@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from balloon_sim.config import TaskConfig
 from balloon_sim.dynamics import EARTH_RADIUS_M, State
-from balloon_sim.wind import WindField, is_global
+from balloon_sim.wind import WindField, is_global, wind_at
 
 
 class Task(NamedTuple):
@@ -44,7 +44,13 @@ def draw_task(config: TaskConfig, key: jax.Array, truth: WindField) -> Task:
     tries = 1000
     lat = jax.random.uniform(k_lat, (tries,), minval=lat_low, maxval=lat_high)
     lon = jax.random.uniform(k_lon, (tries,), minval=lon_low, maxval=lon_high)
-    goal_lat, goal_lon = _destination(lat, lon, jax.random.uniform(k_bearing, (tries,), maxval=2 * jnp.pi), config.distance_km)
+    if config.direction == "downwind":  # where the start's wind blows, averaged over the levels at the start time
+        at_levels = jax.vmap(lambda la, lo: jax.vmap(lambda al: wind_at(truth, la, lo, al, jnp.array(config.start_hours)))(truth.altitude_km))
+        u, v = jnp.moveaxis(jnp.mean(at_levels(lat, lon), axis=1), -1, 0)  # (tries,) each
+        bearing = jnp.arctan2(u, v)  # 0 is north, pi/2 east
+    else:
+        bearing = jax.random.uniform(k_bearing, (tries,), maxval=2 * jnp.pi)
+    goal_lat, goal_lon = _destination(lat, lon, bearing, config.distance_km)
     goal_lon = goal_lon % 360.0
     inside = (goal_lat >= lat_low) & (goal_lat <= lat_high) & (goal_lon >= lon_low) & (goal_lon <= lon_high)
     if not bool(inside.any()):

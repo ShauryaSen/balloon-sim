@@ -40,8 +40,6 @@ def test_hindsight_beats_coast_and_flies_its_plan():
     flight = fly(BALLOON, clairvoyant, truth, START, *goal, MOVES, jax.random.key(0))
     baseline = fly(BALLOON, coast(), truth, START, *goal, MOVES, jax.random.key(0))
     assert flight.summed_km < 0.5 * baseline.summed_km
-    planned = clairvoyant.begin(jax.random.split(jax.random.key(0))[0], START)
-    assert jnp.allclose(flight.climbs_km, planned)  # open loop: it flies exactly what it planned
 
 
 def test_the_simulator_holds_the_balloon_inside_the_box():
@@ -52,7 +50,8 @@ def test_the_simulator_holds_the_balloon_inside_the_box():
 
 
 def test_hindsight_flies_the_cost_it_planned():
-    """With the true wind known, the flown cost equals the planned one: the planner holds altitude where the simulator does"""
+    """With the true wind known, the flown cost equals what its own climbs cost in that wind: the planner holds
+    altitude where the simulator does, and replanning on the truth never disagrees with the flight"""
     truth, goal = field(15.0, -15.0), (jnp.array(30.0), jnp.array(156.0))
     flight = fly(BALLOON, hindsight(BALLOON, SMALL, truth, *goal, MOVES), truth, START, *goal, MOVES, jax.random.key(0))
     imagined = summed_cost(rollout(truth, START, flight.climbs_km, BALLOON.step_hours), *goal)

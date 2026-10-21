@@ -51,3 +51,13 @@ def test_on_a_global_record_the_goal_may_cross_the_seam_but_stays_within_the_lat
         assert jnp.allclose(distance_km(task.start.lat, task.start.lon, task.goal_lat, task.goal_lon), 1000.0, atol=1.0)
         seen_near_seam |= bool((task.start.lon > 350.0) | (task.start.lon < 10.0))
     assert seen_near_seam  # starts near the seam are allowed, nothing is reserved as a margin
+
+
+def test_a_downwind_goal_lies_where_the_wind_blows():
+    """Wind 10 m/s due east everywhere: the goal is 1,000 km east of the start, so same latitude, greater longitude"""
+    uv = jnp.zeros((2, 2, 2, 2, 2)).at[..., 0].set(10.0)
+    east = WindField(jnp.array([0.0, 240.0]), jnp.array([15.0, 20.0]), jnp.array([20.0, 50.0]), jnp.array([120.0, 240.0]), uv)
+    for seed in range(5):
+        task = draw_task(TaskConfig(direction="downwind"), jax.random.key(seed), east)
+        assert jnp.allclose(task.goal_lat, task.start.lat, atol=1.0)  # due east: a great circle bends half a degree equatorward over 1,000 km
+        assert task.goal_lon > task.start.lon

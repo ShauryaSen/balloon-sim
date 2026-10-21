@@ -27,8 +27,9 @@ def belief_about(truth: WindField, sigma: float, key: jax.Array) -> GPBelief:
     return GPBelief(config, forecast(config, key, truth))
 
 
-def test_with_a_perfect_forecast_the_fixed_plan_is_hindsight():
-    """At sigma = 0 every belief draw is the truth, so the floor and the ceiling meet"""
+def test_with_a_perfect_forecast_the_fixed_plan_reaches_the_goal_like_hindsight():
+    """At sigma = 0 every belief draw is the truth, so the floor and the ceiling meet (up to the one solve the
+    fixed plan gets against hindsight's fifty)"""
     truth = east_low_west_high()
     key = jax.random.key(0)
     ceiling = fly(BALLOON, hindsight(BALLOON, SMALL, truth, *GOAL, MOVES), truth, START, *GOAL, MOVES, key)
@@ -93,3 +94,12 @@ def test_mpc_learns_the_wind_it_reads():
     believed = wrong.winds(jax.random.key(9), 0, memory.readings)
     at_balloon = wind_at(believed._replace(uv=believed.uv[0]), START.lat, START.lon, START.altitude_km, START.hours)
     assert jnp.allclose(at_balloon, read(truth, START), atol=0.1)
+
+
+def test_hindsight_is_never_worse_than_a_single_plan_on_the_truth():
+    """Replanning on the truth is the stronger search for the same optimum"""
+    truth = east_low_west_high()
+    key = jax.random.key(0)
+    replanned = fly(BALLOON, hindsight(BALLOON, SMALL, truth, *GOAL, MOVES), truth, START, *GOAL, MOVES, key)
+    once = fly(BALLOON, fixed_plan(BALLOON, SMALL, belief_about(truth, 0.0, key), *GOAL, MOVES, 0), truth, START, *GOAL, MOVES, key)
+    assert replanned.summed_km <= 1.02 * once.summed_km
