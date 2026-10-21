@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> None:
     ask.add_argument("--cpus", type=int, default=1)
     ask.add_argument("--mem-gb", type=int, default=8)
     ask.add_argument("--minutes", default="120")
-    ask.add_argument("--at-once", type=int, default=12, help="array tasks allowed to run at the same time")
+    ask.add_argument("--at-once", type=int, default=48, help="array tasks allowed to run at the same time")
     ask.add_argument("--dry-run", action="store_true", help="print the cells and do not submit")
     asked = ask.parse_args(argv)
 

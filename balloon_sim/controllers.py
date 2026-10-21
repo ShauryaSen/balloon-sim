@@ -40,7 +40,7 @@ def _open_loop(
 
     def begin(key: jax.Array, state: State) -> jax.Array:
         k_winds, k_plan = jax.random.split(key)
-        return plan(balloon, whole_episode, k_plan, winds_for(k_winds), state, goal_lat, goal_lon, jnp.zeros(n_moves))
+        return plan(balloon, whole_episode, k_plan, winds_for(k_winds), state, goal_lat, goal_lon, jnp.zeros(n_moves), jnp.array(n_moves))
 
     def act(memory: jax.Array, key: jax.Array, state: State, move: jax.Array, reading: jax.Array) -> tuple[jax.Array, jax.Array]:
         return memory[move], memory  # the planned climb for this move; the plan itself never changes
@@ -86,8 +86,9 @@ def mpc(
     n_moves: int,
 ) -> Controller:
     """Every move: read the wind here and give it to the belief, draw n_winds fresh winds from the belief (its
-    mean alone when n_winds is 0), plan the next planner.horizon moves from where the balloon really is, fly the
-    first climb, keep the rest of the plan as next move's starting point"""
+    mean alone when n_winds is 0), plan the next planner.horizon moves from where the balloon really is (only
+    the moves left in the episode count), fly the first climb, keep the rest of the plan as next move's
+    starting point"""
 
     def begin(key: jax.Array, state: State) -> MPCMemory:
         return MPCMemory(jnp.zeros(planner.horizon), Readings.empty(n_moves))  # no plan and nothing read yet
@@ -95,7 +96,7 @@ def mpc(
     def act(memory: MPCMemory, key: jax.Array, state: State, move: jax.Array, reading: jax.Array) -> tuple[jax.Array, MPCMemory]:
         readings = memory.readings.add(state, reading)
         k_winds, k_plan = jax.random.split(key)
-        climbs = plan(balloon, planner, k_plan, belief.winds(k_winds, n_winds, readings), state, goal_lat, goal_lon, memory.previous)
+        climbs = plan(balloon, planner, k_plan, belief.winds(k_winds, n_winds, readings), state, goal_lat, goal_lon, memory.previous, n_moves - move)
         shifted = jnp.concatenate([climbs[1:], jnp.zeros(1)])  # the rest of this plan, then coast
         return climbs[0], MPCMemory(shifted, readings)
 

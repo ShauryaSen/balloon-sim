@@ -34,7 +34,7 @@ def cost_of(field: WindField, climbs_km: jax.Array) -> jax.Array:
 @pytest.mark.parametrize("optimizer", ["normalised", "lbfgs"])
 def test_sinks_to_ride_the_eastward_wind(optimizer):
     planner = dataclasses.replace(SMALL, optimizer=optimizer)
-    climbs = plan(BALLOON, planner, jax.random.key(0), batch_of(east_low_west_high(), 1), START, *GOAL, jnp.zeros(8))
+    climbs = plan(BALLOON, planner, jax.random.key(0), batch_of(east_low_west_high(), 1), START, *GOAL, jnp.zeros(8), jnp.array(8))
     assert climbs[0] < -0.5 * BALLOON.climb_cap_km  # heads down at once
     assert jnp.all(jnp.abs(climbs) <= BALLOON.climb_cap_km + 1e-6)
 
@@ -42,7 +42,7 @@ def test_sinks_to_ride_the_eastward_wind(optimizer):
 def test_lbfgs_beats_every_random_plan():
     """The default refinement finds a better plan than the best of many random ones"""
     field = east_low_west_high()
-    climbs = plan(BALLOON, SMALL, jax.random.key(0), batch_of(field, 1), START, *GOAL, jnp.zeros(8))
+    climbs = plan(BALLOON, SMALL, jax.random.key(0), batch_of(field, 1), START, *GOAL, jnp.zeros(8), jnp.array(8))
     cap = BALLOON.climb_cap_km
     random_plans = jax.random.uniform(jax.random.key(1), (2000, 8), minval=-cap, maxval=cap)
     best_random = jnp.min(jax.vmap(lambda c: cost_of(field, c))(random_plans))
@@ -54,14 +54,28 @@ def test_normalised_descent_beats_coasting():
     above L-BFGS (about twice its cost on this wind)"""
     field = east_low_west_high()
     planner = dataclasses.replace(SMALL, optimizer="normalised")
-    climbs = plan(BALLOON, planner, jax.random.key(0), batch_of(field, 1), START, *GOAL, jnp.zeros(8))
+    climbs = plan(BALLOON, planner, jax.random.key(0), batch_of(field, 1), START, *GOAL, jnp.zeros(8), jnp.array(8))
     assert cost_of(field, climbs) < 0.6 * cost_of(field, jnp.zeros(8))
 
 
 def test_a_batch_of_identical_winds_plans_like_one_wind():
     field = east_low_west_high()
-    one = plan(BALLOON, SMALL, jax.random.key(0), batch_of(field, 1), START, *GOAL, jnp.zeros(8))
-    four = plan(BALLOON, SMALL, jax.random.key(0), batch_of(field, 4), START, *GOAL, jnp.zeros(8))
+    one = plan(BALLOON, SMALL, jax.random.key(0), batch_of(field, 1), START, *GOAL, jnp.zeros(8), jnp.array(8))
+    four = plan(BALLOON, SMALL, jax.random.key(0), batch_of(field, 4), START, *GOAL, jnp.zeros(8), jnp.array(8))
     # L-BFGS's line search turns last-digit rounding differences into slightly different plans of nearly the
     # same cost, so compare what the plans score, not the climbs themselves
     assert jnp.allclose(cost_of(field, one), cost_of(field, four), rtol=0.05)
+
+
+def test_moves_after_the_episode_ends_do_not_count():
+    """With 3 moves left, climbs beyond the third change nothing, and the plan ignores a wind it would only
+    meet after the episode: the cost of the first three moves alone is what it minimises"""
+    from balloon_sim.planner import expected_cost
+
+    field = east_low_west_high()
+    a = jnp.array([-1.0, 0.5, 0.2, 0.9, -0.9, 0.9, -0.9, 0.9])
+    changed_tail = a.at[3:].set(0.0)
+    cost = lambda plan_a: expected_cost(BALLOON, SMALL, plan_a, batch_of(field, 1), START, *GOAL, jnp.array(3))
+    assert jnp.allclose(cost(a), cost(changed_tail))
+    first_three = rollout(field, START, BALLOON.climb_cap_km * a[:3], BALLOON.step_hours)
+    assert jnp.allclose(cost(a), summed_cost(first_three, *GOAL), rtol=1e-5)

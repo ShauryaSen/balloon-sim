@@ -38,11 +38,10 @@ def cells(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> li
             out.append(Cell("hindsight", seed, 0.0, n_moves, 0))  # the truth, whatever sigma says
         for multiple in experiment.sigma_multiples:
             sigma = round(multiple * fitted_sigma, 4)
-            for n in experiment.n_winds:
-                if "fixed_plan" in experiment.controllers:
-                    out.append(Cell("fixed_plan", seed, sigma, n_moves, n))
-                if "mpc" in experiment.controllers:
-                    out.extend(Cell("mpc", seed, sigma, horizon, n) for horizon in experiment.horizons)
+            if "fixed_plan" in experiment.controllers:
+                out.extend(Cell("fixed_plan", seed, sigma, n_moves, n) for n in experiment.fixed_plan_n_winds)
+            if "mpc" in experiment.controllers:
+                out.extend(Cell("mpc", seed, sigma, horizon, n) for n in experiment.mpc_n_winds for horizon in experiment.horizons)
     return out
 
 

@@ -79,6 +79,16 @@ class ExperimentConfig:
     real error than above it, because the zermelo sweep found performance flat up to about half of it and
     falling smoothly after"""
 
-    horizons: tuple[int, ...] = (10, 20, 40)  # moves the MPC plans ahead
-    n_winds: tuple[int, ...] = (0, 8)  # belief draws a plan is averaged over; 0 is the belief's mean alone
+    horizons: tuple[int, ...] = (5, 10, 20, 50)
+    """Moves the MPC plans ahead: a doubling ladder (1.25, 2.5 and 5 days) up to the whole 50-move episode,
+    where MPC shares the bounds' horizon and differs from them only by its belief and its replanning"""
+
+    mpc_n_winds: tuple[int, ...] = (0, 1, 4, 16)
+    """Belief draws an MPC plan is averaged over: 0 is the belief's mean (the certainty-equivalent baseline
+    of Myles and zermelo), 1 a single posterior sample, then two doublings to show saturation"""
+
+    fixed_plan_n_winds: tuple[int, ...] = (0, 1, 4, 16, 64)
+    """The same for the fixed plan, which solves once so a large N is nearly free; 64 is the best estimate of
+    the proxy best-fixed-plan bound"""
+
     controllers: tuple[str, ...] = ("hindsight", "fixed_plan", "mpc")

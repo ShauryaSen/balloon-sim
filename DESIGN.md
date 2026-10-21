@@ -106,6 +106,14 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
 29. **Six-hour moves**, the cBottle frame: the climb cap is 2.2 km per move (1.1 km per 3 h) and an episode is
     50 moves, 12.5 days of a 14-day rollout.
 
+30. **The sweep's grid, chosen so it need not be rerun.** Noise: 0, 0.25, 0.5, 1, 2 and 4 times the fitted
+    day-old error. MPC horizons 5, 10, 20 and 50 moves: a doubling ladder up to the whole episode, where MPC
+    shares the bounds' horizon. MPC draws 0, 1, 4, 16 (the mean, one sample, two doublings to show
+    saturation); fixed-plan draws the same plus 64, its best proxy-bound estimate. 32 seeds, which can be
+    extended later since seeds are independent and paired; the other axes cannot be changed without rerunning.
+31. **Only the moves left in the episode count in a plan.** MPC near the end would otherwise optimise moves
+    it never flies, in wind frozen at the record's last frame, more so the longer the horizon.
+
 ## Open
 
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.
