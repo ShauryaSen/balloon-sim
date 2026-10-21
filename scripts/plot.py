@@ -30,6 +30,15 @@ from balloon_sim.results import read_rows
 
 METRICS = {"summed_km": "distance to the goal, summed (km)", "final_km": "distance to the goal at the end (km)"}
 INK, COLOURS = "#12161b", ("#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00")
+STYLE = {"hindsight": "-", "mpc": "-", "fixed_plan": "--"}
+"""A line's colour says how many winds it planned on, its style which controller it is: hindsight black,
+MPC solid, the fixed plan dashed, so the same draw count can be compared across the two"""
+
+
+def colour(controller: str, n_winds: int) -> str:
+    if controller == "hindsight":
+        return INK
+    return COLOURS[{0: 0, 1: 1, 4: 2, 16: 3, 64: 4}.get(n_winds, 0)]
 
 
 def label(controller: str, n_winds: int) -> str:
@@ -78,7 +87,7 @@ def draw_lines(lines: dict, sigmas: list[float], metric: str, into: Path, title:
     figure, panel = plt.subplots(figsize=(7.0, 4.6), dpi=200)
     for slot, (which, line) in enumerate(sorted(lines.items())):
         means, errors = at_every_sigma(line, sigmas, metric)
-        panel.errorbar(sigmas, means, yerr=errors, label=label(*which), color=COLOURS[slot % len(COLOURS)],
+        panel.errorbar(sigmas, means, yerr=errors, label=label(*which), color=colour(*which), linestyle=STYLE[which[0]],
                        marker="o", markersize=4, capsize=3, linewidth=1.5)
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
     panel.set_ylabel(METRICS[metric])
@@ -108,10 +117,10 @@ def draw_violins(lines: dict, sigmas: list[float], metric: str, into: Path, titl
             continue
         drawn = panel.violinplot(data, positions=at, widths=width * 0.9, showmedians=True, showextrema=False)
         for body in drawn["bodies"]:
-            body.set_facecolor(COLOURS[slot % len(COLOURS)])
-            body.set_alpha(0.55)
+            body.set_facecolor(colour(*key))
+            body.set_alpha(0.55 if key[0] != "fixed_plan" else 0.3)
         drawn["cmedians"].set_color(INK)
-        panel.plot([], [], color=COLOURS[slot % len(COLOURS)], linewidth=6, alpha=0.55, label=label(*key))
+        panel.plot([], [], color=colour(*key), linewidth=6, alpha=0.55 if key[0] != "fixed_plan" else 0.3, label=label(*key))
     panel.set_xticks(range(len(sigmas)), [f"{s:g}" for s in sigmas])
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
     panel.set_ylabel(METRICS[metric])
@@ -155,7 +164,7 @@ def draw_score(lines: dict, sigmas: list[float], metric: str, into: Path, title:
             values = np.array(scores, dtype=float)
             means.append(values.mean() if values.size else np.nan)
             errors.append(values.std(ddof=1) / np.sqrt(values.size) if values.size > 1 else np.nan)
-        panel.errorbar(sigmas, means, yerr=errors, label=label(*which), color=COLOURS[slot % len(COLOURS)],
+        panel.errorbar(sigmas, means, yerr=errors, label=label(*which), color=colour(*which), linestyle=STYLE[which[0]],
                        marker="o", markersize=4, capsize=3, linewidth=1.5)
     panel.axhline(1.0, color="#999999", linewidth=0.9, linestyle=":", zorder=0)  # as good as knowing the wind
     panel.axhline(0.0, color="#999999", linewidth=0.9, zorder=0)  # no better than a blind plan
