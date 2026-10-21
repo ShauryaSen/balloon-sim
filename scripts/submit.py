@@ -3,7 +3,8 @@
     uv run scripts/submit.py --dry-run          # print the cells and stop
     uv run scripts/submit.py                    # write the array script and sbatch it
 
-One array task runs one cell, so a failure loses one flight rather than the sweep. The task's index picks its
+One array task runs one cell and writes its own row file, so a failure loses one flight rather than the sweep
+and no two tasks ever write the same file (appends to one file from many tasks tore a line on NFS). The task's index picks its
 line out of a cell list written beside the results, which keeps the sbatch script short and lets a failed
 subset be resubmitted by hand. Slurm caps an array at 1,001 tasks, so the list is submitted as arrays of
 1,000, each starting at its own offset into the one list.
@@ -37,7 +38,7 @@ ARRAY = """#!/bin/bash
 set -euo pipefail
 cd {root}
 CELL=$(sed -n "$(({offset} + SLURM_ARRAY_TASK_ID + 1))p" {list})
-uv run scripts/run_cell.py $CELL --out {out}
+uv run scripts/run_cell.py $CELL --out {out}/$(({offset} + SLURM_ARRAY_TASK_ID)).jsonl
 """
 
 
@@ -53,7 +54,7 @@ def flags(cell) -> str:
 
 def main(argv: list[str] | None = None) -> None:
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ask.add_argument("--out", default="results/rows.jsonl")
+    ask.add_argument("--out", default="results/rows", help="a directory: one .jsonl per cell, named by its index")
     ask.add_argument("--name", default="balloon")
     ask.add_argument("--partition", default="dean")
     ask.add_argument("--cpus", type=int, default=1)
@@ -78,6 +79,7 @@ def main(argv: list[str] | None = None) -> None:
     runs = root / "results"
     logs = runs / "logs"
     logs.mkdir(parents=True, exist_ok=True)
+    (root / asked.out).mkdir(parents=True, exist_ok=True)
     listing = runs / "cells.txt"
     listing.write_text("\n".join(lines) + "\n")
     (runs / "cells.json").write_text(json.dumps([cell._asdict() for cell in grid], indent=1))

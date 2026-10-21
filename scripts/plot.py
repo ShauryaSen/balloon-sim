@@ -1,6 +1,6 @@
 """Read result rows and draw the figures
 
-    uv run scripts/plot.py results/rows.jsonl --into figures/
+    uv run scripts/plot.py results/rows --into figures/      # a directory of per-cell files, or .jsonl files
 
 For each metric (summed distance and final distance) and each MPC horizon, three figures:
 

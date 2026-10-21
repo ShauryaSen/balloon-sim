@@ -8,7 +8,8 @@ One row is one flight. Its columns:
     start_lat, start_lon, goal_lat, goal_lon
     summed_km, final_km   the two metrics
     seconds               how long the flight took
-Rows are stored as JSON lines: one row per line of a .jsonl file.
+Rows are stored as JSON lines: one row per line of a .jsonl file. A sweep writes one file per cell under a
+directory, since many cells appending to one file at once on NFS can tear a line; read_rows takes either.
 """
 
 import dataclasses
@@ -46,5 +47,19 @@ def write_rows(path: str | Path, rows: list[dict]) -> None:
 
 
 def read_rows(paths: list[str | Path]) -> list[dict]:
-    """Every row in the given .jsonl files"""
-    return [json.loads(line) for path in paths for line in Path(path).read_text().splitlines() if line]
+    """Every row in the given .jsonl files, or in every .jsonl under a given directory. A line that is not a
+    row (two cells once appended to one file at the same moment on NFS and tore a line) is skipped and
+    reported, not fatal"""
+    files = [f for p in paths for f in (sorted(Path(p).glob("*.jsonl")) if Path(p).is_dir() else [Path(p)])]
+    rows, torn = [], 0
+    for path in files:
+        for line in path.read_text().splitlines():
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                torn += 1
+    if torn:
+        print(f"skipped {torn} torn line(s); the cells they belonged to need rerunning")
+    return rows

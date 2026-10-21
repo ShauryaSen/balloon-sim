@@ -1,3 +1,5 @@
+import json
+
 import jax.numpy as jnp
 
 from balloon_sim.config import BeliefConfig, PlannerConfig
@@ -24,3 +26,10 @@ def test_rows_survive_writing_and_reading(tmp_path):
     write_rows(path, rows[:1])
     write_rows(path, rows[1:])  # appends
     assert read_rows([path]) == rows
+
+
+def test_a_torn_line_is_skipped_and_a_directory_is_read(tmp_path):
+    good = row(FLIGHT, TASK, controller="mpc", n_winds=0, seed=0, seconds=0.1, settings={"planner": PlannerConfig()})
+    (tmp_path / "0.jsonl").write_text(json.dumps(good) + "\n4711}\n")
+    (tmp_path / "1.jsonl").write_text(json.dumps(good) + "\n")
+    assert read_rows([tmp_path]) == [good, good]
