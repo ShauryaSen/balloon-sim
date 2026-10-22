@@ -18,6 +18,7 @@ def test_a_row_flattens_every_setting_and_carries_the_metrics():
     assert r["planner.horizon"] == 20 and r["belief.sigma"] == 4.8
     assert r["summed_km"] == 1234.5 and abs(r["final_km"] - 67.8) < 1e-4
     assert (r["start_lat"], r["goal_lon"]) == (30.0, 151.0)
+    assert r["closest_move"] == 1 and r["closest_km"] > 0  # FLIGHT never moves, so every move is equally close
 
 
 def test_rows_survive_writing_and_reading(tmp_path):

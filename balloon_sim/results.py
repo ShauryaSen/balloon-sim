@@ -7,6 +7,7 @@ One row is one flight. Its columns:
     <piece>.<field>       every setting the flight ran with, e.g. "planner.horizon", "belief.sigma"
     start_lat, start_lon, goal_lat, goal_lon
     summed_km, final_km   the two metrics
+    closest_km, closest_move   the nearest the balloon came to the goal, and after which move (from 1)
     seconds               how long the flight took
 Rows are stored as JSON lines: one row per line of a .jsonl file. A sweep writes one file per cell under a
 directory, since many cells appending to one file at once on NFS can tear a line; read_rows takes either.
@@ -17,6 +18,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+import jax.numpy as jnp
+
+from balloon_sim.dynamics import distance_km
 from balloon_sim.episode import Flight
 from balloon_sim.task import Task
 
@@ -24,6 +28,7 @@ from balloon_sim.task import Task
 def row(flight: Flight, task: Task, *, controller: str, n_winds: int, seed: int, seconds: float, settings: dict[str, Any]) -> dict:
     """settings maps a piece's name to its config, e.g. {"planner": PlannerConfig(...), "belief": BeliefConfig(...)}"""
     columns: dict[str, Any] = {"controller": controller, "n_winds": n_winds, "seed": seed}
+    along = distance_km(flight.visited.lat, flight.visited.lon, task.goal_lat, task.goal_lon)  # after each move
     for piece, config in settings.items():
         for field, value in dataclasses.asdict(config).items():
             columns[f"{piece}.{field}"] = value
@@ -34,6 +39,8 @@ def row(flight: Flight, task: Task, *, controller: str, n_winds: int, seed: int,
         goal_lon=float(task.goal_lon),
         summed_km=float(flight.summed_km),
         final_km=float(flight.final_km),
+        closest_km=float(jnp.min(along)),
+        closest_move=int(jnp.argmin(along)) + 1,
         seconds=seconds,
     )
     return columns
