@@ -2,7 +2,9 @@
 
     uv run scripts/plot.py results/rows --into figures/      # a directory of per-cell files, or .jsonl files
 
-For each metric (summed distance and final distance) and each MPC horizon, three figures:
+For each metric and each MPC draw count, the headline: MPC's excess over hindsight against sigma, a line per
+horizon (where they converge, a longer horizon stops helping). Then for each metric and each MPC horizon, three
+figures:
 
     lines     the metric against sigma, a line per controller, with the spread across seeds
     violins   the same numbers as distributions, since the spread is what the lines hide
@@ -179,6 +181,39 @@ def draw_score(lines: dict, sigmas: list[float], metric: str, into: Path, title:
     plt.close(figure)
 
 
+def draw_horizons(rows: list[dict], sigmas: list[float], horizons: list[int], metric: str, n_winds: int, into: Path) -> None:
+    """The headline: MPC's excess over hindsight against sigma, a line per horizon, paired within each seed.
+
+    Where the lines converge, a longer horizon no longer recovers what the noise takes away. The bar is a 95%
+    interval on the paired mean (1.96 standard errors over seeds)."""
+    hind = {r["seed"]: r[metric] for r in rows if r["controller"] == "hindsight"}
+    if not hind:
+        return
+    figure, panel = plt.subplots(figsize=(7.0, 4.6), dpi=200)
+    shades = plt.get_cmap("viridis")(np.linspace(0.15, 0.85, len(horizons)))
+    for shade, horizon in zip(shades, horizons):
+        means, half = [], []
+        for sigma in sigmas:
+            gaps = np.array([r[metric] - hind[r["seed"]] for r in rows if r["controller"] == "mpc" and r["planner.horizon"] == horizon
+                             and r["n_winds"] == n_winds and r["belief.sigma"] == sigma and r["seed"] in hind], dtype=float)
+            scale = 1.0 / rows[0]["task.n_moves"] if metric == "summed_km" else 1.0  # summed shown as an average per move
+            means.append(gaps.mean() * scale if gaps.size else np.nan)
+            half.append(1.96 * gaps.std(ddof=1) / np.sqrt(gaps.size) * scale if gaps.size > 1 else np.nan)
+        panel.errorbar(sigmas, means, yerr=half, label=f"horizon {horizon} ({horizon * rows[0]['balloon.step_hours']:g} h)",
+                       color=shade, marker="o", markersize=4, capsize=3, linewidth=1.8)
+    panel.axhline(0.0, color=INK, linewidth=0.9)  # hindsight
+    what = "average distance over the episode" if metric == "summed_km" else METRICS[metric].split(" (")[0]
+    panel.set_xlabel("forecast error $\\sigma$ (m/s)")
+    panel.set_ylabel(f"MPC minus hindsight, {what} (km)")
+    drawn = "the belief's mean" if n_winds == 0 else f"{n_winds} belief draws"
+    panel.set_title(f"MPC above hindsight, by horizon (MPC on {drawn})", fontsize=11, loc="left", color=INK)
+    panel.spines[["top", "right"]].set_visible(False)
+    panel.legend(frameon=False, fontsize=8)
+    figure.tight_layout()
+    figure.savefig(into)
+    plt.close(figure)
+
+
 def main(argv: list[str] | None = None) -> None:
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ask.add_argument("rows", nargs="+", help="the .jsonl files to read")
@@ -201,6 +236,9 @@ def main(argv: list[str] | None = None) -> None:
             draw_lines(lines, sigmas, metric, into / f"lines_{stem}.png", named)
             draw_violins(lines, sigmas, metric, into / f"violins_{stem}.png", named)
             draw_score(lines, sigmas, metric, into / f"score_{stem}.png", f"MPC between the bounds: {named}")
+    for metric in METRICS:
+        for n in sorted({r["n_winds"] for r in rows if r["controller"] == "mpc"}):
+            draw_horizons(rows, sigmas, horizons, metric, n, into / f"horizons_{metric}_n{n}.png")
     print(f"wrote {len(list(into.glob('*.png')))} figures under {into}")
 
 
