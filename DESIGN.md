@@ -136,6 +136,12 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     within 200 km on at least 24 of 32 seeds. 1,000 km: 27/32; 2,000 km: 21; 3,000 km: 14. Every row now also
     records closest approach and when it happened, since final distance misreads a far goal.
 
+36. **Hindsight is the best search found on the true wind**, per seed and per metric: the minimum over
+    hindsight's own flight and every zero-noise cell, all of which plan on the truth. On the 1,000 km sweep the
+    zero-noise MPC at horizon 20 was below hindsight on average (-34 km, within noise) but by up to 1,593 km on
+    single seeds, where hindsight's 50-move search went badly. The ceiling should not depend on one search's
+    luck. Applied when results are read (`results.best_hindsight`), so no rerun.
+
 ## Open
 
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.

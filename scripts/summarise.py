@@ -17,7 +17,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.results import read_rows
+from balloon_sim.results import best_hindsight, read_rows
 
 
 def keyed(rows: list[dict]) -> dict:
@@ -50,7 +50,7 @@ def main(argv: list[str] | None = None) -> None:
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ask.add_argument("rows", nargs="+")
     asked = ask.parse_args(argv)
-    rows = read_rows(asked.rows)
+    rows = best_hindsight(read_rows(asked.rows))  # hindsight: the best search found on the true wind
     by = keyed(rows)
     hind = by[("hindsight", None, 0, 0.0)]
     sigmas = sorted({k[3] for k in by if k[0] != "hindsight"})

@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.results import read_rows
+from balloon_sim.results import best_hindsight, read_rows
 
 METRICS = {"summed_km": "distance to the goal, summed (km)", "final_km": "distance to the goal at the end (km)"}
 INK, COLOURS = "#12161b", ("#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00")
@@ -46,7 +46,7 @@ def colour(controller: str, n_winds: int) -> str:
 def label(controller: str, n_winds: int) -> str:
     """What a line is called: hindsight reads the truth, so its draws mean nothing"""
     if controller == "hindsight":
-        return "hindsight (knows the wind)"
+        return "hindsight (best search on the true wind)"
     drawn = "mean" if n_winds == 0 else f"{n_winds} draws"
     return f"{'fixed plan' if controller == 'fixed_plan' else 'MPC'}, {drawn}"
 
@@ -220,7 +220,7 @@ def main(argv: list[str] | None = None) -> None:
     ask.add_argument("--into", default="figures", help="where the figures are written")
     asked = ask.parse_args(argv)
 
-    rows = read_rows(asked.rows)
+    rows = best_hindsight(read_rows(asked.rows))  # hindsight: the best search found on the true wind
     if not rows:
         sys.exit("no rows in those files")
     into = Path(asked.into)

@@ -70,3 +70,32 @@ def read_rows(paths: list[str | Path]) -> list[dict]:
     if torn:
         print(f"skipped {torn} torn line(s); the cells they belonged to need rerunning")
     return rows
+
+
+CLAIRVOYANT_METRICS = ("summed_km", "final_km", "closest_km")
+
+
+def best_hindsight(rows: list[dict]) -> list[dict]:
+    """The rows with each seed's hindsight replaced by the best any search found on the true wind.
+
+    Every cell at sigma 0 plans on the truth, as hindsight does, so each is a clairvoyant flight; they differ only
+    in how well their optimiser searched. Hindsight is meant to be the best a clairvoyant controller can do, and the
+    best of these searches is the closest we have to it (DESIGN.md 34, 36). Each metric takes its own best, since
+    each is bounded on its own. Rows that lack a metric (written before it existed) keep hindsight's own value.
+    """
+    clairvoyant: dict[int, list[dict]] = {}
+    for r in rows:
+        if r["controller"] == "hindsight" or r["belief.sigma"] == 0.0:
+            clairvoyant.setdefault(r["seed"], []).append(r)
+    out = []
+    for r in rows:
+        if r["controller"] != "hindsight":
+            out.append(r)
+            continue
+        best = dict(r)
+        for metric in CLAIRVOYANT_METRICS:
+            values = [c[metric] for c in clairvoyant[r["seed"]] if metric in c]
+            if values:
+                best[metric] = min(values)
+        out.append(best)
+    return out
