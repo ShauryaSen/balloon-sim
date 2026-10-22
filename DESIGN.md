@@ -131,6 +131,11 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     first sweep. L-BFGS beat Myles's normalised descent on 7 of 8 ERA5 seeds and random search on all 8, so the
     optimiser is not what limits the controllers.
 
+35. **Goal 1,000 km downwind**, replacing 300 km, chosen by a rule fixed before the test
+    (`docs/goal-distance-test-2026-10-22.md`): the longest distance at or above 1,000 km where hindsight comes
+    within 200 km on at least 24 of 32 seeds. 1,000 km: 27/32; 2,000 km: 21; 3,000 km: 14. Every row now also
+    records closest approach and when it happened, since final distance misreads a far goal.
+
 ## Open
 
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.

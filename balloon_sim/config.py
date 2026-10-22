@@ -47,7 +47,7 @@ class TaskConfig:
     n_moves: int = 50  # length of an episode: 50 three-hour moves is 6.25 days of the 10-day record
     start_hours: float = 0.0  # when in the record the episode starts
     # random mode: a start drawn inside the allowed area, the goal distance_km away in a random direction
-    distance_km: float = 300.0
+    distance_km: float = 1000.0  # chosen by docs/goal-distance-test-2026-10-22.md
     direction: Literal["random", "downwind"] = "downwind"  # the goal's bearing: any, or where the start's wind blows
     margin_deg: float = 3.0  # start and goal at least this far inside a regional record's edges
     lat_band: tuple[float, float] = (20.0, 50.0)  # launches and goals within these latitudes: summer mid-latitudes

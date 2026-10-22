@@ -31,3 +31,21 @@ and this note records why. Ties do not arise: the longest is unique.
 What would change the choice regardless of the rule: if the qualifying distance's hindsight reaches the goal only
 near the end of the episode (median closest move after 45 of 50), the episode is too short to say anything about
 holding it, and that is reported alongside.
+
+## Result (run on Unicorn, Slurm job 471615, rows in `~/balloon-sim/results-distance/`)
+
+| goal | hindsight within 200 km | within 500 km | closest approach, median [quartiles] | move of closest, median | final, median | average distance, median |
+|---|---|---|---|---|---|---|
+| 300 km | 30/32 | 32/32 | 47 km [7, 98] | 5 | 480 km | 413 km |
+| 1,000 km | 27/32 | 31/32 | 62 km [5, 152] | 26 | 295 km | 332 km |
+| 2,000 km | 21/32 | 27/32 | 73 km [9, 383] | 39 | 402 km | 729 km |
+| 3,000 km | 14/32 | 25/32 | 269 km [27, 471] | 43 | 579 km | 1,249 km |
+
+By the rule, **1,000 km** is chosen: the longest distance at or above 1,000 km with at least 24 of 32 seeds
+within 200 km (27). 2,000 km falls short (21), 3,000 km well short (14). Its closest approach comes at a median
+move of 26 of 50, so the episode is long enough to say something about holding the goal afterwards.
+
+Also visible, not part of the rule: the 1,000 km goal ends nearer (median 295 km) and averages nearer (332 km)
+than the 300 km goal (480 and 413), because the balloon spends half the episode travelling toward it instead
+of being blown off a goal it reached after five moves. The far goal turns the task from holding a point into
+steering while drifting, which suits winds no level can cancel.
