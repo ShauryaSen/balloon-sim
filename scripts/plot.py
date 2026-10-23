@@ -218,6 +218,44 @@ def draw_horizons(rows: list[dict], sigmas: list[float], horizons: list[int], me
     plt.close(figure)
 
 
+def draw_replanning(rows: list[dict], sigmas: list[float], horizons: list[int], metric: str, n_winds: int, into: Path) -> None:
+    """What replanning is worth: MPC minus the fixed plan, paired within each seed, a line per horizon.
+
+    Both controllers plan on the same belief, so the only difference between them is that MPC re-solves from
+    where the balloon really is. Below zero MPC is nearer the goal. The bars are 95% intervals on the paired
+    mean (1.96 standard errors over seeds). The comparison is paired because subtracting two separately
+    averaged lines would carry the seed-to-seed spread of the task into a difference that does not contain it.
+    """
+    floor = {(r["seed"], r["belief.sigma"]): r[metric] for r in rows if r["controller"] == "fixed_plan" and r["n_winds"] == n_winds}
+    if not floor:
+        return
+    scale = 1.0 / rows[0]["task.n_moves"] if metric == "summed_km" else 1.0
+    figure, panel = plt.subplots(figsize=(7.0, 4.6), dpi=200)
+    shades = plt.get_cmap("viridis")(np.linspace(0.15, 0.85, len(horizons)))
+    for shade, horizon in zip(shades, horizons):
+        means, half = [], []
+        for sigma in sigmas:
+            gaps = np.array([r[metric] - floor[(r["seed"], sigma)] for r in rows
+                             if r["controller"] == "mpc" and r["planner.horizon"] == horizon
+                             and r["n_winds"] == n_winds and r["belief.sigma"] == sigma
+                             and (r["seed"], sigma) in floor], dtype=float)
+            means.append(gaps.mean() * scale if gaps.size else np.nan)
+            half.append(1.96 * gaps.std(ddof=1) / np.sqrt(gaps.size) * scale if gaps.size > 1 else np.nan)
+        panel.errorbar(sigmas, means, yerr=half, label=f"horizon {horizon} ({horizon * rows[0]['balloon.step_hours']:g} h)",
+                       color=shade, marker="o", markersize=4, capsize=3, linewidth=1.8)
+    panel.axhline(0.0, color=INK, linewidth=0.9)  # the fixed plan: above it, replanning cost more than it gave
+    what = "average distance" if metric == "summed_km" else METRICS[metric].split(" (")[0]
+    panel.set_xlabel("forecast error $\\sigma$ (m/s)")
+    panel.set_ylabel(f"MPC $-$ fixed plan, {what} (km)")
+    drawn = "the belief's mean" if n_winds == 0 else f"{n_winds} belief draws"
+    panel.set_title(f"What replanning is worth (both planning on {drawn})", fontsize=11, loc="left", color=INK)
+    panel.spines[["top", "right"]].set_visible(False)
+    panel.legend(frameon=False, fontsize=8)
+    figure.tight_layout()
+    figure.savefig(into)
+    plt.close(figure)
+
+
 def draw_surface(rows: list[dict], sigmas: list[float], horizons: list[int], metric: str, n_winds: int, into: Path) -> None:
     """The same numbers as `horizons_*`, as one surface over forecast error and horizon.
 
@@ -286,6 +324,7 @@ def main(argv: list[str] | None = None) -> None:
         for n in sorted({r["n_winds"] for r in rows if r["controller"] == "mpc"}):
             draw_horizons(rows, sigmas, horizons, metric, n, into / f"horizons_{metric}_n{n}.png")
             draw_surface(rows, sigmas, horizons, metric, n, into / f"surface_{metric}_n{n}.png")
+            draw_replanning(rows, sigmas, horizons, metric, n, into / f"replanning_{metric}_n{n}.png")
     print(f"wrote {len(list(into.glob('*.png')))} figures under {into}")
 
 
