@@ -25,7 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.cells import cells
+from balloon_sim.cells import ARMS, cells
 from balloon_sim.config import BeliefConfig, ExperimentConfig, TaskConfig
 
 ARRAY = """#!/bin/bash
@@ -51,10 +51,22 @@ ARRAY_LIMIT = 1000
 """Tasks per array: Slurm's MaxArraySize on Unicorn is 1,001"""
 
 
-def flags(cell) -> str:
+def flags(cell, pool: int, keep_path: bool) -> str:
     """One cell as the arguments run_cell.py takes"""
-    return (f"--controller {cell.controller} --seed {cell.seed} --sigma {cell.sigma} "
-            f"--horizon {cell.horizon} --n-winds {cell.n_winds}")
+    out = (f"--controller {cell.controller} --seed {cell.seed} --sigma {cell.sigma} "
+           f"--horizon {cell.horizon} --n-winds {cell.n_winds} --goal-km {cell.goal_km} "
+           f"--belief-scale {cell.belief_scale}")
+    if cell.nested:
+        out += f" --nested --nested-pool {pool}"
+    if keep_path:
+        out += " --keep-path"
+    return out
+
+
+def drawn(cell, pool: int) -> int:
+    """How many winds the cell actually draws, which is what its memory scales with. A nested cell draws the
+    whole pool however few of them its plan ends up averaging over"""
+    return pool if cell.nested else cell.n_winds
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -67,20 +79,30 @@ def main(argv: list[str] | None = None) -> None:
     ask.add_argument("--minutes", default="120")
     ask.add_argument("--at-once", type=int, default=48, help="array tasks allowed to run at the same time")
     ask.add_argument("--big-mem-gb", type=int, default=40, help="memory for cells averaging over many draws")
-    ask.add_argument("--big-draws", type=int, default=32, help="a cell with at least this many draws is big")
+    ask.add_argument("--big-draws", type=int, default=16, help="a cell drawing at least this many winds is big")
+    ask.add_argument("--arms", default=",".join(ARMS), help=f"which arms to run, comma separated: {', '.join(ARMS)}")
+    ask.add_argument("--keep-path", action="store_true", help="record every cell's trajectory in its row")
     ask.add_argument("--dry-run", action="store_true", help="print the cells and do not submit")
     ask.add_argument("overrides", nargs="*", help="after --: run_cell.py flags added to every cell")
     asked = ask.parse_args(argv)
     extra = " ".join(asked.overrides)
 
     root = Path(__file__).resolve().parents[1]
-    grid = cells(ExperimentConfig(), TaskConfig().n_moves, BeliefConfig().sigma)
-    lines = [f"{flags(cell)} {extra}".strip() for cell in grid]
+    experiment = ExperimentConfig()
+    arms = tuple(name.strip() for name in asked.arms.split(",") if name.strip())
+    unknown = [name for name in arms if name not in ARMS]
+    if unknown:
+        raise SystemExit(f"no such arm: {', '.join(unknown)}. Known arms: {', '.join(ARMS)}")
+    grid = cells(experiment, TaskConfig().n_moves, BeliefConfig().sigma, arms)
+    pool = experiment.nested_pool
+    lines = [f"{flags(cell, pool, asked.keep_path)} {extra}".strip() for cell in grid]
 
     counted: dict[str, int] = {}
     for cell in grid:
         counted[cell.controller] = counted.get(cell.controller, 0) + 1
-    print(f"{len(grid)} cells: " + ", ".join(f"{n} {name}" for name, n in sorted(counted.items())))
+    print(f"{len(grid)} cells over arms {', '.join(arms)}: " + ", ".join(f"{n} {name}" for name, n in sorted(counted.items())))
+    for name in arms:  # what each arm costs on its own, before the overlap between them is removed
+        print(f"  {name:12s} {len(cells(experiment, TaskConfig().n_moves, BeliefConfig().sigma, (name,))):5d} cells")
     if asked.dry_run:
         print("\n".join(lines[:10]) + ("\n..." if len(lines) > 10 else ""))
         return
@@ -93,7 +115,7 @@ def main(argv: list[str] | None = None) -> None:
     listing.write_text("\n".join(lines) + "\n")
     (runs / "cells.json").write_text(json.dumps([cell._asdict() for cell in grid], indent=1))
 
-    big = [i for i, cell in enumerate(grid) if cell.n_winds >= asked.big_draws]
+    big = [i for i, cell in enumerate(grid) if drawn(cell, pool) >= asked.big_draws]
     groups = [("", [i for i in range(len(grid)) if i not in set(big)], asked.mem_gb), ("big-", big, asked.big_mem_gb)]
     for prefix, indices, mem_gb in groups:
         if not indices:

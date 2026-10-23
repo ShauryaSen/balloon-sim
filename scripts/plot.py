@@ -30,7 +30,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from balloon_sim.results import best_hindsight, read_rows
 
-METRICS = {"summed_km": "distance to the goal, summed (km)", "final_km": "distance to the goal at the end (km)"}
+METRICS = {
+    "cost_km": "the objective: distance summed until arrival (km)",
+    "summed_km": "distance to the goal, summed over every move (km)",
+    "final_km": "distance to the goal at the end (km)",
+    "closest_km": "the nearest the balloon came to the goal (km)",
+}
+"""What gets a figure. cost_km is the objective under the arrival rule and summed_km the plain sum, so on a
+sweep run with arrival_km = 0 the two are the same and their figures agree. closest_km is how near the
+balloon ever came, which is the honest reachability measure once the goal is far: a balloon still flying
+toward a distant goal at the last move can end nearer than one that reached a near goal and was blown past."""
+
+SUMMED = ("summed_km", "cost_km")  # shown as an average per move, since a sum over 50 moves is hard to read
 INK, COLOURS = "#12161b", ("#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00")
 STYLE = {"hindsight": "-", "mpc": "-", "fixed_plan": "--"}
 """A line's colour says how many winds it planned on, its style which controller it is: hindsight black,
@@ -200,13 +211,13 @@ def draw_horizons(rows: list[dict], sigmas: list[float], horizons: list[int], me
         for sigma in sigmas:
             gaps = np.array([r[metric] - hind[r["seed"]] for r in rows if r["controller"] == "mpc" and r["planner.horizon"] == horizon
                              and r["n_winds"] == n_winds and r["belief.sigma"] == sigma and r["seed"] in hind], dtype=float)
-            scale = 1.0 / rows[0]["task.n_moves"] if metric == "summed_km" else 1.0  # summed shown as an average per move
+            scale = 1.0 / rows[0]["task.n_moves"] if metric in SUMMED else 1.0  # a sum shown as an average per move
             means.append(gaps.mean() * scale if gaps.size else np.nan)
             half.append(1.96 * gaps.std(ddof=1) / np.sqrt(gaps.size) * scale if gaps.size > 1 else np.nan)
         panel.errorbar(sigmas, means, yerr=half, label=f"horizon {horizon} ({horizon * rows[0]['balloon.step_hours']:g} h)",
                        color=shade, marker="o", markersize=4, capsize=3, linewidth=1.8)
     panel.axhline(0.0, color=INK, linewidth=0.9)  # hindsight
-    what = "average distance over the episode" if metric == "summed_km" else METRICS[metric].split(" (")[0]
+    what = "average distance over the episode" if metric in SUMMED else METRICS[metric].split(" (")[0]
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
     panel.set_ylabel(f"MPC minus hindsight, {what} (km)")
     drawn = "the belief's mean" if n_winds == 0 else f"{n_winds} belief draws"
@@ -233,7 +244,7 @@ def draw_replanning(rows: list[dict], sigmas: list[float], horizons: list[int], 
     floor = {(r["seed"], r["belief.sigma"]): r[metric] for r in rows if r["controller"] == "fixed_plan" and r["n_winds"] == n_winds}
     if not floor:
         return
-    scale = 1.0 / rows[0]["task.n_moves"] if metric == "summed_km" else 1.0
+    scale = 1.0 / rows[0]["task.n_moves"] if metric in SUMMED else 1.0
     figure, panel = plt.subplots(figsize=(7.0, 4.6), dpi=200)
     shades = plt.get_cmap("viridis")(np.linspace(0.15, 0.85, len(horizons)))
     for shade, horizon in zip(shades, horizons):
@@ -247,7 +258,7 @@ def draw_replanning(rows: list[dict], sigmas: list[float], horizons: list[int], 
         panel.plot(sigmas, means, label=f"horizon {horizon} ({horizon * rows[0]['balloon.step_hours']:g} h)",
                    color=shade, marker="o", markersize=4, linewidth=1.8)
     panel.axhline(0.0, color=INK, linewidth=0.9)  # the fixed plan: above it, replanning cost more than it gave
-    what = "average distance" if metric == "summed_km" else METRICS[metric].split(" (")[0]
+    what = "average distance" if metric in SUMMED else METRICS[metric].split(" (")[0]
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
     panel.set_ylabel(f"MPC $-$ fixed plan, {what} (km)")
     drawn = "the belief's mean" if n_winds == 0 else f"{n_winds} belief draws"
@@ -271,7 +282,7 @@ def draw_surface(rows: list[dict], sigmas: list[float], horizons: list[int], met
     hind = {r["seed"]: r[metric] for r in rows if r["controller"] == "hindsight"}
     if not hind:
         return
-    scale = 1.0 / rows[0]["task.n_moves"] if metric == "summed_km" else 1.0
+    scale = 1.0 / rows[0]["task.n_moves"] if metric in SUMMED else 1.0
     height = np.full((len(horizons), len(sigmas)), np.nan)
     for i, horizon in enumerate(horizons):
         for j, sigma in enumerate(sigmas):
@@ -289,7 +300,7 @@ def draw_surface(rows: list[dict], sigmas: list[float], horizons: list[int], met
     panel.set_yticks(range(len(horizons)), [f"{h} ({h * rows[0]['balloon.step_hours']:g} h)" for h in horizons])
     panel.set_xlabel("forecast error $\\sigma$ (m/s)", labelpad=8)
     panel.set_ylabel("MPC horizon", labelpad=14)
-    what = "average distance" if metric == "summed_km" else "final distance"
+    what = "average distance" if metric in SUMMED else METRICS[metric].split(" (")[0]
     panel.set_zlabel(f"MPC $-$ hindsight, {what} (km)", labelpad=10)
     drawn = "the belief's mean" if n_winds == 0 else f"{n_winds} belief draws"
     panel.set_title(f"MPC above hindsight over error and horizon (MPC on {drawn})", fontsize=11, color=INK, y=0.97)
@@ -308,6 +319,7 @@ def main(argv: list[str] | None = None) -> None:
     asked = ask.parse_args(argv)
 
     rows = best_hindsight(read_rows(asked.rows))  # hindsight: the best search found on the true wind
+    drawn_metrics = {m: name for m, name in METRICS.items() if any(m in r for r in rows)}  # older rows lack some
     if not rows:
         sys.exit("no rows in those files")
     into = Path(asked.into)
@@ -317,13 +329,13 @@ def main(argv: list[str] | None = None) -> None:
     horizons = sorted({r["planner.horizon"] for r in rows if r["controller"] == "mpc"}) or [0]
     for horizon in horizons:
         lines = series(rows, horizon)
-        for metric in METRICS:
+        for metric in drawn_metrics:
             stem = f"{metric}_h{horizon}"
             named = f"{METRICS[metric].split(' (')[0]}, MPC horizon {horizon}"
             draw_lines(lines, sigmas, metric, into / f"lines_{stem}.png", named)
             draw_dots(lines, sigmas, metric, into / f"dots_{stem}.png", named)
             draw_score(lines, sigmas, metric, into / f"score_{stem}.png", f"MPC between the bounds: {named}")
-    for metric in METRICS:
+    for metric in drawn_metrics:
         for n in sorted({r["n_winds"] for r in rows if r["controller"] == "mpc"}):
             draw_horizons(rows, sigmas, horizons, metric, n, into / f"horizons_{metric}_n{n}.png")
             draw_surface(rows, sigmas, horizons, metric, n, into / f"surface_{metric}_n{n}.png")

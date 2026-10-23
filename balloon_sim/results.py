@@ -6,8 +6,14 @@ One row is one flight. Its columns:
     seed
     <piece>.<field>       every setting the flight ran with, e.g. "planner.horizon", "belief.sigma"
     start_lat, start_lon, goal_lat, goal_lon
-    summed_km, final_km   the two metrics
+    summed_km, final_km   distance to the goal summed over every move, and after the last move
+    cost_km               the objective: summed until the balloon arrives, nothing after (the arrival rule)
+    arrived, arrived_move whether it ever came within task.arrival_km, and the move it first did (0 if never)
     closest_km, closest_move   the nearest the balloon came to the goal, and after which move (from 1)
+    goal_km               how far the goal was placed, in km
+    belief_scale          what the belief assumed the error was, as a multiple of the real one; 1 is calibrated
+    nested                whether the draws were a subset of one shared pool rather than drawn fresh
+    path_lat, path_lon, path_altitude_km   the trajectory, when the cell was asked to keep it
     seconds               how long the flight took
 Rows are stored as JSON lines: one row per line of a .jsonl file. A sweep writes one file per cell under a
 directory, since many cells appending to one file at once on NFS can tear a line; read_rows takes either.
@@ -25,8 +31,24 @@ from balloon_sim.episode import Flight
 from balloon_sim.task import Task
 
 
-def row(flight: Flight, task: Task, *, controller: str, n_winds: int, seed: int, seconds: float, settings: dict[str, Any]) -> dict:
-    """settings maps a piece's name to its config, e.g. {"planner": PlannerConfig(...), "belief": BeliefConfig(...)}"""
+def row(
+    flight: Flight,
+    task: Task,
+    *,
+    controller: str,
+    n_winds: int,
+    seed: int,
+    seconds: float,
+    settings: dict[str, Any],
+    extra: dict[str, Any] | None = None,
+    keep_path: bool = False,
+) -> dict:
+    """settings maps a piece's name to its config, e.g. {"planner": PlannerConfig(...), "belief": BeliefConfig(...)}.
+
+    `extra` carries what the cell knows and the configs do not, such as which goal distance was drawn or
+    whether the draws were nested. `keep_path` adds the trajectory, which is three numbers per move: worth it
+    for the arms whose shape is in question, and about 2 kB a row, so not for every cell of every sweep.
+    """
     columns: dict[str, Any] = {"controller": controller, "n_winds": n_winds, "seed": seed}
     along = distance_km(flight.visited.lat, flight.visited.lon, task.goal_lat, task.goal_lon)  # after each move
     for piece, config in settings.items():
@@ -39,10 +61,20 @@ def row(flight: Flight, task: Task, *, controller: str, n_winds: int, seed: int,
         goal_lon=float(task.goal_lon),
         summed_km=float(flight.summed_km),
         final_km=float(flight.final_km),
+        cost_km=float(flight.cost_km),
+        arrived=bool(flight.arrived),
+        arrived_move=int(flight.arrived_move),
         closest_km=float(jnp.min(along)),
         closest_move=int(jnp.argmin(along)) + 1,
         seconds=seconds,
     )
+    if keep_path:
+        columns.update(
+            path_lat=[round(float(x), 4) for x in flight.visited.lat],
+            path_lon=[round(float(x), 4) for x in flight.visited.lon],
+            path_altitude_km=[round(float(x), 4) for x in flight.visited.altitude_km],
+        )
+    columns.update(extra or {})
     return columns
 
 
@@ -72,7 +104,7 @@ def read_rows(paths: list[str | Path]) -> list[dict]:
     return rows
 
 
-CLAIRVOYANT_METRICS = ("summed_km", "final_km", "closest_km")
+CLAIRVOYANT_METRICS = ("summed_km", "final_km", "closest_km", "cost_km")
 
 
 def best_hindsight(rows: list[dict]) -> list[dict]:

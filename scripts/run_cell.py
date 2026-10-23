@@ -18,7 +18,7 @@ import jax.numpy as jnp
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.belief import GPBelief, forecast
+from balloon_sim.belief import GPBelief, Nested, forecast
 from balloon_sim.cells import keys
 from balloon_sim.config import BalloonConfig, BeliefConfig, PlannerConfig, TaskConfig, WindConfig
 from balloon_sim.controllers import fixed_plan, hindsight, mpc
@@ -45,11 +45,18 @@ def reader(annotation) -> type:
 def parser() -> argparse.ArgumentParser:
     """The cell's own arguments, then one flag per field of every config"""
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ask.add_argument("--controller", required=True, choices=("hindsight", "fixed_plan", "mpc"))
+    ask.add_argument("--controller", required=True, choices=("hindsight", "fixed_plan", "mpc", "mpc_blind"))
     ask.add_argument("--seed", type=int, required=True)
     ask.add_argument("--sigma", type=float, required=True, help="the forecast's error, overriding belief.sigma")
     ask.add_argument("--horizon", type=int, help="moves the MPC plans ahead, overriding planner.horizon")
     ask.add_argument("--n-winds", type=int, default=0, help="belief draws a plan is averaged over; 0 is its mean")
+    ask.add_argument("--goal-km", type=float, help="how far downwind the goal is, overriding task.distance_km")
+    ask.add_argument("--belief-scale", type=float, default=1.0,
+                     help="what the belief assumes the error is, as a multiple of --sigma; 1 is calibrated")
+    ask.add_argument("--nested", action="store_true",
+                     help="draw one pool of --nested-pool winds and use the first --n-winds of it")
+    ask.add_argument("--nested-pool", type=int, default=16, help="the pool the nested draws come from")
+    ask.add_argument("--keep-path", action="store_true", help="also record the trajectory in the row")
     ask.add_argument("--out", default="results/rows.jsonl", help="the .jsonl the row is added to")
     for piece, config in PIECES.items():
         for field in dataclasses.fields(config):
@@ -73,6 +80,8 @@ def build(asked: dict):
     pieces["belief"] = dataclasses.replace(pieces["belief"], sigma=asked["sigma"])
     if asked["horizon"] is not None:
         pieces["planner"] = dataclasses.replace(pieces["planner"], horizon=asked["horizon"])
+    if asked.get("goal_km") is not None:
+        pieces["task"] = dataclasses.replace(pieces["task"], distance_km=asked["goal_km"])
     return pieces
 
 
@@ -85,29 +94,40 @@ def main(argv: list[str] | None = None) -> None:
     k_task, k_noise, k_fly = keys(asked["seed"])
     task = draw_task(task_config, k_task, truth)
 
-    # the forecast is the truth under one error field; at sigma = 0 that field is zero and the two agree
-    believed = GPBelief(belief_config, forecast(belief_config, k_noise, truth))
-    n_moves, n_winds = task_config.n_moves, asked["n_winds"]
+    # The error actually put into the forecast is belief_config's sigma. What the controller believes about
+    # that error is the same kernel with its amplitude scaled, so a scale other than 1 is a belief that is
+    # wrong about its own uncertainty while the world is unchanged.
+    assumed = dataclasses.replace(belief_config, sigma=belief_config.sigma * asked["belief_scale"])
+    believed = GPBelief(assumed, forecast(belief_config, k_noise, truth))
+    if asked["nested"]:
+        believed = Nested(believed, asked["nested_pool"])
+
+    n_moves, n_winds, radius = task_config.n_moves, asked["n_winds"], task_config.arrival_km
     if asked["controller"] == "hindsight":
-        controller = hindsight(balloon, planner, truth, task.goal_lat, task.goal_lon, n_moves)
+        controller = hindsight(balloon, planner, truth, task.goal_lat, task.goal_lon, n_moves, radius)
     elif asked["controller"] == "fixed_plan":
-        controller = fixed_plan(balloon, planner, believed, task.goal_lat, task.goal_lon, n_moves, n_winds)
+        controller = fixed_plan(balloon, planner, believed, task.goal_lat, task.goal_lon, n_moves, n_winds, radius)
     else:
-        controller = mpc(balloon, planner, believed, task.goal_lat, task.goal_lon, n_winds, n_moves)
+        controller = mpc(balloon, planner, believed, task.goal_lat, task.goal_lon, n_winds, n_moves, radius,
+                         learns=asked["controller"] == "mpc")
 
     began = time.perf_counter()
-    flight = fly(balloon, controller, truth, task.start, task.goal_lat, task.goal_lon, n_moves, k_fly)
+    flight = fly(balloon, controller, truth, task.start, task.goal_lat, task.goal_lon, n_moves, k_fly, radius)
     jax.block_until_ready(flight.summed_km)  # JAX is lazy, so the clock would otherwise stop before the flight
     seconds = time.perf_counter() - began
 
     written = row(
-        flight, task, controller=asked["controller"], n_winds=n_winds, seed=asked["seed"], seconds=seconds, settings=pieces
+        flight, task, controller=asked["controller"], n_winds=n_winds, seed=asked["seed"], seconds=seconds, settings=pieces,
+        extra={"goal_km": task_config.distance_km, "belief_scale": asked["belief_scale"], "nested": asked["nested"]},
+        keep_path=asked["keep_path"],
     )
     Path(asked["out"]).parent.mkdir(parents=True, exist_ok=True)
     write_rows(asked["out"], [written])
+    reached = f"move {int(flight.arrived_move):2d}" if bool(flight.arrived) else "   never"
     print(f"{asked['controller']:10s} seed {asked['seed']:3d} sigma {asked['sigma']:5.2f} "
-          f"horizon {planner.horizon:3d} n_winds {n_winds:2d}  "
-          f"summed {float(flight.summed_km):10.1f} km  final {float(flight.final_km):8.1f} km  {seconds:6.1f} s")
+          f"horizon {planner.horizon:3d} n_winds {n_winds:2d} goal {task_config.distance_km:5.0f} km "
+          f"scale {asked['belief_scale']:3.1f}  cost {float(flight.cost_km):10.1f} km  "
+          f"arrived {reached}  final {float(flight.final_km):8.1f} km  {seconds:6.1f} s")
 
 
 if __name__ == "__main__":

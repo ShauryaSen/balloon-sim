@@ -18,7 +18,7 @@ import jax.numpy as jnp
 import optax
 
 from balloon_sim.config import BalloonConfig, PlannerConfig
-from balloon_sim.dynamics import State, distance_km, rollout
+from balloon_sim.dynamics import State, counted, distance_km, rollout
 from balloon_sim.wind import WindField
 
 BATCHED = WindField(None, None, None, None, 0)
@@ -34,16 +34,24 @@ def expected_cost(
     goal_lat: jax.Array,
     goal_lon: jax.Array,
     remaining: jax.Array,
+    arrival_km: float = 0.0,
 ) -> jax.Array:
-    """J(a, w) for each wind w in the batch, averaged. Only the first `remaining` moves count: the rest of the
-    horizon would be flown after the episode ends, so it must not steer the plan"""
-    counted = jnp.arange(planner.horizon) < remaining  # (H,)
+    """J(a, w) for each wind w in the batch, averaged. Only moves the episode is still running for count: the
+    rest of the horizon would be flown after the episode ends, so it must not steer the plan. Under the
+    arrival rule (arrival_km > 0) the episode also ends on arrival, so the planner is minimising the same
+    thing the simulator scores it on; with arrival_km = 0 this is the plain sum over the remaining moves.
+
+    The mask depends on the plan, since where a plan arrives decides what it is charged for, so the objective
+    is piecewise smooth rather than smooth. Inside a piece the gradient is the one L-BFGS wants, and the pool
+    of 102 starting plans is what carries the search across the pieces.
+    """
     last = jnp.clip(remaining - 1, 0, planner.horizon - 1)  # the move the episode ends on
 
     def in_one_wind(w: WindField) -> jax.Array:
         visited = rollout(w, state, balloon.climb_cap_km * a, balloon.step_hours, balloon.substeps)
         distance = distance_km(visited.lat, visited.lon, goal_lat, goal_lon)  # (H,) after each move
-        return jnp.sum(jnp.where(counted, distance, 0.0)) if planner.cost == "summed" else distance[last]
+        keep = counted(distance, arrival_km, remaining)
+        return jnp.sum(jnp.where(keep, distance, 0.0)) if planner.cost == "summed" else distance[last]
 
     return jnp.mean(jax.vmap(in_one_wind, in_axes=(BATCHED,))(winds))
 
@@ -123,10 +131,11 @@ def plan(
     goal_lon: jax.Array,
     previous_km: jax.Array,
     remaining: jax.Array,
+    arrival_km: float = 0.0,
 ) -> jax.Array:
-    """The H climbs (km) with the lowest cost averaged over the batch of winds, counting only the `remaining`
-    moves left in the episode"""
-    J = lambda a: expected_cost(balloon, planner, a, winds, state, goal_lat, goal_lon, remaining)
+    """The H climbs (km) with the lowest cost averaged over the batch of winds, counting only the moves the
+    episode is still running for: those left in it, and those before the plan arrives"""
+    J = lambda a: expected_cost(balloon, planner, a, winds, state, goal_lat, goal_lon, remaining, arrival_km)
 
     # 1-2: the pool, every plan scored once, the best few kept
     pool = candidates(balloon, planner, key, state, previous_km, winds.altitude_km[0], winds.altitude_km[-1])

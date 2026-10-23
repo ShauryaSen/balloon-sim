@@ -74,6 +74,37 @@ def distance_km(lat1: jax.Array, lon1: jax.Array, lat2: jax.Array, lon2: jax.Arr
     return 2.0 * EARTH_RADIUS_M / 1000.0 * jnp.arcsin(jnp.sqrt(h + 1e-12))
 
 
+def counted(distance: jax.Array, arrival_km: float, remaining: jax.Array) -> jax.Array:
+    """Which of a run of moves count toward the cost: a mask over the moves, shape (H,).
+
+    A move counts if the episode is still running when it is flown. The episode ends the first time the
+    balloon is within arrival_km of the goal, and the moves after that cost nothing, so arriving sooner is
+    worth more than arriving at all. `remaining` cuts the moves a plan would make after the episode is over,
+    which matters near the end, where a horizon reaches past the last move.
+
+    The arrival move itself counts. With arrival_km = 0 nothing is ever within it, so every move up to
+    `remaining` counts and the cost is the plain sum: the rule before this one, as a special case.
+    """
+    index = jnp.arange(distance.shape[0])
+    arrived = distance < arrival_km
+    first = jnp.where(jnp.any(arrived), jnp.argmax(arrived), distance.shape[0] - 1)
+    return (index < remaining) & (index <= first)
+
+
+def episode_cost(visited: State, goal_lat: jax.Array, goal_lon: jax.Array, arrival_km: float) -> jax.Array:
+    """J under the arrival rule: distance to the goal after each move, summed until the balloon arrives"""
+    distance = distance_km(visited.lat, visited.lon, goal_lat, goal_lon)
+    return jnp.sum(jnp.where(counted(distance, arrival_km, distance.shape[0]), distance, 0.0))
+
+
+def arrival(visited: State, goal_lat: jax.Array, goal_lon: jax.Array, arrival_km: float) -> tuple[jax.Array, jax.Array]:
+    """Whether the balloon ever came within arrival_km, and the move it first did (from 1; 0 if it never did)"""
+    distance = distance_km(visited.lat, visited.lon, goal_lat, goal_lon)
+    arrived = distance < arrival_km
+    ever = jnp.any(arrived)
+    return ever, jnp.where(ever, jnp.argmax(arrived) + 1, 0)
+
+
 def summed_cost(visited: State, goal_lat: jax.Array, goal_lon: jax.Array) -> jax.Array:
     """J = distance to the goal after each move, summed over the moves, in km"""
     return jnp.sum(distance_km(visited.lat, visited.lon, goal_lat, goal_lon))

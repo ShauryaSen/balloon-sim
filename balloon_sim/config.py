@@ -45,6 +45,13 @@ class TaskConfig:
 
     mode: Literal["random", "fixed"] = "random"
     n_moves: int = 50  # length of an episode: 50 three-hour moves is 6.25 days of the 10-day record
+    arrival_km: float = 200.0
+    """The episode ends the first time the balloon is this close, and the moves after it cost nothing, so the
+    task is reach the goal and reach it soon rather than sit on it (decision 37). 200 km is the radius the
+    goal-distance rule was fixed with: about one move of drift at a typical 10 m/s stratospheric wind, and
+    about two cells of the 2 degree grid. Zero turns the rule off and gives the plain sum over every move,
+    which is what the sweeps before 2026-10-23 scored"""
+
     start_hours: float = 0.0  # when in the record the episode starts
     # random mode: a start drawn inside the allowed area, the goal distance_km away in a random direction
     distance_km: float = 1000.0  # chosen by docs/goal-distance-test-2026-10-22.md
@@ -75,6 +82,22 @@ class ExperimentConfig:
     """
 
     seeds: tuple[int, ...] = tuple(range(32))
+
+    goal_distances: tuple[float, ...] = (1000.0, 2000.0, 3000.0)
+    """How far downwind the goal is. 1,000 km is the rule-chosen distance hindsight reaches on 27 of 32 seeds;
+    2,000 (21 of 32) and 3,000 (14 of 32) are there as a difficulty axis, to see whether the breaking point
+    moves when the task stops being comfortably reachable"""
+
+    belief_scales: tuple[float, ...] = (0.5, 2.0)
+    """What the controller's belief assumes the error is, as a multiple of what it actually is. 1 is the
+    calibrated belief every sweep so far has used, where noise and belief share a kernel by construction;
+    these two arms are a belief that is wrong about its own uncertainty, under-confident at 2 and
+    over-confident at 0.5. If averaging over draws ever pays, it should pay here"""
+
+    nested_pool: int = 16
+    """Draws in the shared pool of the nested-draw arm, where N = 1, 4 and 16 are subsets of one pool rather
+    than fresh draws, so the arms differ only in how many winds the plan saw"""
+
     sigma_multiples: tuple[float, ...] = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0)
     """Forecast error as a multiple of BeliefConfig.sigma, the record's own day-old error, so the ladder is 0,
     a quarter, a half, one, two and four times a real 24 h forecast whatever record is flown. Denser below the

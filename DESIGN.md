@@ -142,6 +142,42 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     single seeds, where hindsight's 50-move search went badly. The ceiling should not depend on one search's
     luck. Applied when results are read (`results.best_hindsight`), so no rerun.
 
+37. **The episode ends on arrival.** The first time the balloon is within `task.arrival_km` (200 km, the radius
+    the goal-distance rule was fixed with) the episode is over, and the moves after it cost nothing. The old
+    objective summed distance over all 50 moves with no terminal cost, so the last moves carried almost no
+    weight and the best plan threw the end of the episode away: every controller reached the goal around move
+    26 and was then blown a thousand km off it, hindsight included. The rule makes the task reach the goal,
+    and reach it soon. `arrival_km = 0` turns it off and gives back the old sum exactly, so the sweeps before
+    this one are still readable. Both the planner and the simulator apply it, or the planner would be
+    optimising something it is not scored on; the cost is piecewise smooth as a result, and the pool of 102
+    starting plans is what carries the search between the pieces.
+38. **A fourth controller, `mpc_blind`**: replans every move but never gives its readings to the belief.
+    Current MPC does two things at once — re-solve from where the balloon really is, and learn the wind from
+    its own anemometer — and the 400 km it gains over the fixed plan cannot be split between them. Against
+    `mpc_blind` the difference is what the readings were worth; `mpc_blind` against the fixed plan is what
+    replanning alone was worth.
+39. **Goal distance as an axis**: 1,000, 2,000 and 3,000 km, which hindsight reached on 27, 21 and 14 of 32
+    seeds in the distance test. 1,000 stays the main arm; the other two ask whether the ordering and the
+    breaking point survive a goal that is barely reachable. A different distance is a different task, so each
+    distance carries its own hindsight and is never paired against another.
+40. **A deliberately miscalibrated belief**: the controller assumes the error is 0.5 or 2 times what it
+    actually is, the world unchanged. Every sweep so far had the noise and the belief sharing a kernel by
+    construction, which is the most unrealistic thing in the setup and the likeliest reason averaging over
+    draws has never helped: with a belief that is already right, its mean is all a plan needs. If hedging
+    pays anywhere, it should pay here.
+41. **Nested draws**: in one small arm, N = 1, 4 and 16 are the first 1, 4 and 16 of a single pool of 16
+    rather than fresh draws. Fresh draws make the arms differ in two ways at once — how many winds the plan
+    saw, and which winds they happened to be — and at 32 seeds that luck is the size of the effect. Nesting
+    leaves only the count. Every nested cell draws the whole pool, so the arm costs what its largest member
+    costs, which is why it is three noise levels and one horizon rather than the whole ladder.
+42. **The sweep is arms, not a grid.** A full factorial over noise, horizon, draws, goal distance and belief
+    scale is tens of thousands of flights that mostly answer nothing, since a cell moving two knobs cannot say
+    which one did the work. There is a main arm at the base setting (goal 1,000 km, calibrated belief) and one
+    small arm per question, each moving a single axis away from it. Compare inside an arm. 7,904 cells.
+43. **Trajectories are kept** (`--keep-path`), about 2 kB a row. Without them a question like "does it reach
+    the goal and get pushed back, or circle it?" cannot be answered from a finished sweep at all, which is
+    what happened to the 1,000 km sweep.
+
 ## Open
 
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.

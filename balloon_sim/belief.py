@@ -16,7 +16,7 @@ Readings condition the belief pathwise (Wilson et al. 2020): with readings y at 
 where f is a prior draw. Each draw is pulled through the readings exactly, and the mean is the usual GP posterior.
 """
 
-from typing import NamedTuple, Protocol
+from typing import Any, NamedTuple, Protocol
 
 import jax
 import jax.numpy as jnp
@@ -206,3 +206,26 @@ class GPBelief(NamedTuple):
             fields = grid.uv[None] + _prior_on_grid(self.config, features, w, grid)
             at_readings = _mean_at(grid, readings)[None] + _prior_at(self.config, features, w, readings)
         return grid._replace(uv=_conditioned(self.config, fields, at_readings, grid, readings))
+
+
+class Nested(NamedTuple):
+    """A belief whose n draws are the first n of one pool of `pool` draws, rather than n drawn fresh.
+
+    With fresh draws, the N = 1, 4 and 16 arms differ in two ways at once: how many winds the plan was
+    averaged over, and which winds those happened to be. A run of four winds can be lucky and a run of one
+    unlucky, and at 32 seeds that luck is the same size as the effect being looked for. Taking the arms as
+    nested subsets of one pool makes the draws shared, so the only difference left between the arms is how
+    many of them the plan saw.
+
+    The price is that every arm costs what the largest one costs: the pool is drawn in full even for N = 1.
+    That is why it is a separate, small arm of the sweep rather than how every cell is run.
+    """
+
+    belief: Any
+    pool: int
+
+    def winds(self, key: jax.Array, n: int, readings: Readings) -> WindField:
+        if n == 0:
+            return self.belief.winds(key, 0, readings)
+        drawn = self.belief.winds(key, self.pool, readings)
+        return drawn._replace(uv=drawn.uv[:n])
