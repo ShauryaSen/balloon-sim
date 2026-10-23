@@ -218,6 +218,48 @@ def draw_horizons(rows: list[dict], sigmas: list[float], horizons: list[int], me
     plt.close(figure)
 
 
+def draw_surface(rows: list[dict], sigmas: list[float], horizons: list[int], metric: str, n_winds: int, into: Path) -> None:
+    """The same numbers as `horizons_*`, as one surface over forecast error and horizon.
+
+    Both axes are drawn evenly spaced rather than to scale: sigma doubles and the horizon roughly doubles, so
+    on a true scale the low end, where the horizons separate, would be squashed into a corner. Ticks carry the
+    real values. Height is MPC's excess over hindsight, paired within each seed, so the floor is the ceiling
+    controller and lower is better. The grid is 4 horizons by 6 noise levels, which is coarse for a surface:
+    the points drawn on it are the measurements, everything between them is interpolation.
+    """
+    hind = {r["seed"]: r[metric] for r in rows if r["controller"] == "hindsight"}
+    if not hind:
+        return
+    scale = 1.0 / rows[0]["task.n_moves"] if metric == "summed_km" else 1.0
+    height = np.full((len(horizons), len(sigmas)), np.nan)
+    for i, horizon in enumerate(horizons):
+        for j, sigma in enumerate(sigmas):
+            gaps = [r[metric] - hind[r["seed"]] for r in rows if r["controller"] == "mpc" and r["planner.horizon"] == horizon
+                    and r["n_winds"] == n_winds and r["belief.sigma"] == sigma and r["seed"] in hind]
+            if gaps:
+                height[i, j] = float(np.mean(gaps)) * scale
+
+    figure = plt.figure(figsize=(8.0, 6.0), dpi=200)
+    panel = figure.add_subplot(projection="3d")
+    x, y = np.meshgrid(np.arange(len(sigmas)), np.arange(len(horizons)))
+    panel.plot_surface(x, y, height, cmap="viridis", edgecolor=INK, linewidth=0.35, alpha=0.9, rstride=1, cstride=1)
+    panel.scatter(x, y, height, color=INK, s=8, depthshade=False)
+    panel.set_xticks(range(len(sigmas)), [f"{s:g}" for s in sigmas])
+    panel.set_yticks(range(len(horizons)), [f"{h} ({h * rows[0]['balloon.step_hours']:g} h)" for h in horizons])
+    panel.set_xlabel("forecast error $\\sigma$ (m/s)", labelpad=8)
+    panel.set_ylabel("MPC horizon", labelpad=14)
+    what = "average distance" if metric == "summed_km" else "final distance"
+    panel.set_zlabel(f"MPC $-$ hindsight, {what} (km)", labelpad=10)
+    drawn = "the belief's mean" if n_winds == 0 else f"{n_winds} belief draws"
+    panel.set_title(f"MPC above hindsight over error and horizon (MPC on {drawn})", fontsize=11, color=INK, y=0.97)
+    panel.view_init(elev=24, azim=-128)  # looking in along both axes, so the fan at low sigma is face on
+    panel.tick_params(labelsize=8)
+    panel.set_box_aspect((1.35, 1.0, 0.78), zoom=1.08)
+    figure.subplots_adjust(left=0.02, right=0.97, bottom=0.04, top=0.99)
+    figure.savefig(into)
+    plt.close(figure)
+
+
 def main(argv: list[str] | None = None) -> None:
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ask.add_argument("rows", nargs="+", help="the .jsonl files to read")
@@ -243,6 +285,7 @@ def main(argv: list[str] | None = None) -> None:
     for metric in METRICS:
         for n in sorted({r["n_winds"] for r in rows if r["controller"] == "mpc"}):
             draw_horizons(rows, sigmas, horizons, metric, n, into / f"horizons_{metric}_n{n}.png")
+            draw_surface(rows, sigmas, horizons, metric, n, into / f"surface_{metric}_n{n}.png")
     print(f"wrote {len(list(into.glob('*.png')))} figures under {into}")
 
 
