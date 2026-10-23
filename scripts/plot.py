@@ -7,13 +7,13 @@ horizon (where they converge, a longer horizon stops helping). Then for each met
 figures:
 
     lines     the metric against sigma, a line per controller, with the spread across seeds
-    violins   the same numbers as distributions, with every seed drawn on its violin (violins_plain: without)
+    dots      the same numbers seed by seed, one dot per seed and no summary line
     score     where MPC sits between the fixed plan and hindsight, paired within each seed
 
 Everything is paired. Within a seed the start, the goal and the true wind are the same for every controller
 and every sigma, so a seed that drew a hard flight makes every line worse together. Comparing seed by seed
 and then averaging the differences removes that, where averaging each line separately leaves it in. The
-violins are drawn on the raw numbers, because the point of them is to show the spread the pairing removes.
+dots are drawn on the raw numbers, because the point of them is to show the spread the pairing removes.
 """
 
 import argparse
@@ -101,14 +101,13 @@ def draw_lines(lines: dict, sigmas: list[float], metric: str, into: Path, title:
     plt.close(figure)
 
 
-def draw_violins(lines: dict, sigmas: list[float], metric: str, into: Path, title: str, seeds: bool = True) -> None:
-    """The same numbers as distributions: one violin per controller at each sigma, grouped along the axis.
+def draw_dots(lines: dict, sigmas: list[float], metric: str, into: Path, title: str) -> None:
+    """The same numbers seed by seed: one column of dots per controller at each sigma, grouped along the axis.
 
-    With `seeds`, every seed is drawn on its violin as well, jittered across the width so points at the same
-    height can be told apart. At 32 seeds the points are the data and the violin is only a smoothing of them,
-    so where the two disagree the points are right: a shape with a shoulder but no points under it is the
-    kernel widening a gap, not seeds sitting there. The jitter is cosmetic and drawn from a fixed key, so the
-    figure is the same every time it is made.
+    Only the dots, no smoothed shape or summary line: at 32 seeds the points are the data, and a violin's
+    kernel or a median tick adds a shape the seeds do not have. Each column is jittered sideways so points at
+    the same height can be told apart; the jitter is cosmetic and drawn from a fixed key, so the figure is the
+    same every time it is made.
     """
     which = sorted(lines)
     figure, panel = plt.subplots(figsize=(1.9 * len(sigmas) + 2.0, 4.6), dpi=200)
@@ -116,25 +115,18 @@ def draw_violins(lines: dict, sigmas: list[float], metric: str, into: Path, titl
     shake = np.random.default_rng(0)
     for slot, key in enumerate(which):
         offset = (slot - (len(which) - 1) / 2) * width
-        at, data = [], []
-        only = next(iter(lines[key].values())) if len(lines[key]) == 1 else None
+        only = next(iter(lines[key].values())) if len(lines[key]) == 1 else None  # hindsight: one run per seed
         for i, sigma in enumerate(sigmas):
             by_seed = only if only is not None else lines[key].get(sigma, {})
-            if by_seed:
-                at.append(i + offset)
-                data.append([r[metric] for r in by_seed.values()])
-        if not data:
-            continue
-        drawn = panel.violinplot(data, positions=at, widths=width * 0.9, showmedians=True, showextrema=False)
-        for body in drawn["bodies"]:
-            body.set_facecolor(colour(*key))
-            body.set_alpha(0.55 if key[0] != "fixed_plan" else 0.3)
-        drawn["cmedians"].set_color(INK)
-        if seeds:
-            for middle, values in zip(at, data):
-                jitter = shake.uniform(-width * 0.26, width * 0.26, len(values))
-                panel.scatter(middle + jitter, values, s=3.0, color=INK, alpha=0.55, linewidths=0, zorder=3)
-        panel.plot([], [], color=colour(*key), linewidth=6, alpha=0.55 if key[0] != "fixed_plan" else 0.3, label=label(*key))
+            if not by_seed:
+                continue
+            values = [r[metric] for r in by_seed.values()]
+            jitter = shake.uniform(-width * 0.35, width * 0.35, len(values))
+            hollow = key[0] == "fixed_plan"  # the fixed plan's dots are open, as its lines are dashed elsewhere
+            panel.scatter(i + offset + jitter, values, s=7.0, linewidths=0.8, zorder=3,
+                          facecolors="none" if hollow else colour(*key), edgecolors=colour(*key), alpha=0.8)
+        panel.scatter([], [], s=14.0, linewidths=0.8, facecolors="none" if key[0] == "fixed_plan" else colour(*key),
+                      edgecolors=colour(*key), label=label(*key))
     panel.set_xticks(range(len(sigmas)), [f"{s:g}" for s in sigmas])
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
     panel.set_ylabel(METRICS[metric])
@@ -246,8 +238,7 @@ def main(argv: list[str] | None = None) -> None:
             stem = f"{metric}_h{horizon}"
             named = f"{METRICS[metric].split(' (')[0]}, MPC horizon {horizon}"
             draw_lines(lines, sigmas, metric, into / f"lines_{stem}.png", named)
-            draw_violins(lines, sigmas, metric, into / f"violins_{stem}.png", named)
-            draw_violins(lines, sigmas, metric, into / f"violins_plain_{stem}.png", named, seeds=False)
+            draw_dots(lines, sigmas, metric, into / f"dots_{stem}.png", named)
             draw_score(lines, sigmas, metric, into / f"score_{stem}.png", f"MPC between the bounds: {named}")
     for metric in METRICS:
         for n in sorted({r["n_winds"] for r in rows if r["controller"] == "mpc"}):
