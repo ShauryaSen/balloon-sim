@@ -222,9 +222,13 @@ def draw_replanning(rows: list[dict], sigmas: list[float], horizons: list[int], 
     """What replanning is worth: MPC minus the fixed plan, paired within each seed, a line per horizon.
 
     Both controllers plan on the same belief, so the only difference between them is that MPC re-solves from
-    where the balloon really is. Below zero MPC is nearer the goal. The bars are 95% intervals on the paired
-    mean (1.96 standard errors over seeds). The comparison is paired because subtracting two separately
-    averaged lines would carry the seed-to-seed spread of the task into a difference that does not contain it.
+    where the balloon really is. Below zero MPC is nearer the goal. The comparison is paired because
+    subtracting two separately averaged lines would carry the seed-to-seed spread of the task into a
+    difference that does not contain it.
+
+    No interval is drawn: with four horizons the bars overlapped enough to hide the lines, and this figure is
+    for the shape, where each horizon crosses zero and how the gap grows. The intervals behind it are in
+    `docs/results-2026-10-22.md` and in `horizons_*.png`, and they are what any claim should be read off.
     """
     floor = {(r["seed"], r["belief.sigma"]): r[metric] for r in rows if r["controller"] == "fixed_plan" and r["n_winds"] == n_winds}
     if not floor:
@@ -233,16 +237,15 @@ def draw_replanning(rows: list[dict], sigmas: list[float], horizons: list[int], 
     figure, panel = plt.subplots(figsize=(7.0, 4.6), dpi=200)
     shades = plt.get_cmap("viridis")(np.linspace(0.15, 0.85, len(horizons)))
     for shade, horizon in zip(shades, horizons):
-        means, half = [], []
+        means = []
         for sigma in sigmas:
             gaps = np.array([r[metric] - floor[(r["seed"], sigma)] for r in rows
                              if r["controller"] == "mpc" and r["planner.horizon"] == horizon
                              and r["n_winds"] == n_winds and r["belief.sigma"] == sigma
                              and (r["seed"], sigma) in floor], dtype=float)
             means.append(gaps.mean() * scale if gaps.size else np.nan)
-            half.append(1.96 * gaps.std(ddof=1) / np.sqrt(gaps.size) * scale if gaps.size > 1 else np.nan)
-        panel.errorbar(sigmas, means, yerr=half, label=f"horizon {horizon} ({horizon * rows[0]['balloon.step_hours']:g} h)",
-                       color=shade, marker="o", markersize=4, capsize=3, linewidth=1.8)
+        panel.plot(sigmas, means, label=f"horizon {horizon} ({horizon * rows[0]['balloon.step_hours']:g} h)",
+                   color=shade, marker="o", markersize=4, linewidth=1.8)
     panel.axhline(0.0, color=INK, linewidth=0.9)  # the fixed plan: above it, replanning cost more than it gave
     what = "average distance" if metric == "summed_km" else METRICS[metric].split(" (")[0]
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
