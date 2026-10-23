@@ -7,7 +7,7 @@ horizon (where they converge, a longer horizon stops helping). Then for each met
 figures:
 
     lines     the metric against sigma, a line per controller, with the spread across seeds
-    violins   the same numbers as distributions, since the spread is what the lines hide
+    violins   the same numbers as distributions, with every seed drawn on its violin (violins_plain: without)
     score     where MPC sits between the fixed plan and hindsight, paired within each seed
 
 Everything is paired. Within a seed the start, the goal and the true wind are the same for every controller
@@ -101,11 +101,19 @@ def draw_lines(lines: dict, sigmas: list[float], metric: str, into: Path, title:
     plt.close(figure)
 
 
-def draw_violins(lines: dict, sigmas: list[float], metric: str, into: Path, title: str) -> None:
-    """The same numbers as distributions: one violin per controller at each sigma, grouped along the axis"""
+def draw_violins(lines: dict, sigmas: list[float], metric: str, into: Path, title: str, seeds: bool = True) -> None:
+    """The same numbers as distributions: one violin per controller at each sigma, grouped along the axis.
+
+    With `seeds`, every seed is drawn on its violin as well, jittered across the width so points at the same
+    height can be told apart. At 32 seeds the points are the data and the violin is only a smoothing of them,
+    so where the two disagree the points are right: a shape with a shoulder but no points under it is the
+    kernel widening a gap, not seeds sitting there. The jitter is cosmetic and drawn from a fixed key, so the
+    figure is the same every time it is made.
+    """
     which = sorted(lines)
     figure, panel = plt.subplots(figsize=(1.9 * len(sigmas) + 2.0, 4.6), dpi=200)
     width = 0.8 / max(len(which), 1)
+    shake = np.random.default_rng(0)
     for slot, key in enumerate(which):
         offset = (slot - (len(which) - 1) / 2) * width
         at, data = [], []
@@ -122,6 +130,10 @@ def draw_violins(lines: dict, sigmas: list[float], metric: str, into: Path, titl
             body.set_facecolor(colour(*key))
             body.set_alpha(0.55 if key[0] != "fixed_plan" else 0.3)
         drawn["cmedians"].set_color(INK)
+        if seeds:
+            for middle, values in zip(at, data):
+                jitter = shake.uniform(-width * 0.26, width * 0.26, len(values))
+                panel.scatter(middle + jitter, values, s=3.0, color=INK, alpha=0.55, linewidths=0, zorder=3)
         panel.plot([], [], color=colour(*key), linewidth=6, alpha=0.55 if key[0] != "fixed_plan" else 0.3, label=label(*key))
     panel.set_xticks(range(len(sigmas)), [f"{s:g}" for s in sigmas])
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
@@ -235,6 +247,7 @@ def main(argv: list[str] | None = None) -> None:
             named = f"{METRICS[metric].split(' (')[0]}, MPC horizon {horizon}"
             draw_lines(lines, sigmas, metric, into / f"lines_{stem}.png", named)
             draw_violins(lines, sigmas, metric, into / f"violins_{stem}.png", named)
+            draw_violins(lines, sigmas, metric, into / f"violins_plain_{stem}.png", named, seeds=False)
             draw_score(lines, sigmas, metric, into / f"score_{stem}.png", f"MPC between the bounds: {named}")
     for metric in METRICS:
         for n in sorted({r["n_winds"] for r in rows if r["controller"] == "mpc"}):
