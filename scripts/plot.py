@@ -110,7 +110,7 @@ def draw_dots(lines: dict, sigmas: list[float], metric: str, into: Path, title: 
     same every time it is made.
     """
     which = sorted(lines)
-    figure, panel = plt.subplots(figsize=(1.9 * len(sigmas) + 2.0, 4.6), dpi=200)
+    figure, panel = plt.subplots(figsize=(1.9 * len(sigmas) + 4.0, 4.6), dpi=200)
     width = 0.8 / max(len(which), 1)
     shake = np.random.default_rng(0)
     for slot, key in enumerate(which):
@@ -132,7 +132,7 @@ def draw_dots(lines: dict, sigmas: list[float], metric: str, into: Path, title: 
     panel.set_ylabel(METRICS[metric])
     panel.set_title(title, fontsize=11, loc="left", color=INK)
     panel.spines[["top", "right"]].set_visible(False)
-    panel.legend(frameon=False, fontsize=8)
+    panel.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1.0))  # outside, off the dots
     figure.tight_layout()
     figure.savefig(into)
     plt.close(figure)
