@@ -25,7 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.cells import ARMS, cells
+from balloon_sim.cells import ARMS, SWEEP, cells
 from balloon_sim.config import BeliefConfig, ExperimentConfig, TaskConfig
 
 ARRAY = """#!/bin/bash
@@ -55,7 +55,7 @@ def flags(cell, pool: int, keep_path: bool) -> str:
     """One cell as the arguments run_cell.py takes"""
     out = (f"--controller {cell.controller} --seed {cell.seed} --sigma {cell.sigma} "
            f"--horizon {cell.horizon} --n-winds {cell.n_winds} --goal-km {cell.goal_km} "
-           f"--belief-scale {cell.belief_scale}")
+           f"--direction {cell.direction} --belief-scale {cell.belief_scale}")
     if cell.nested:
         out += f" --nested --nested-pool {pool}"
     if keep_path:
@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> None:
     ask.add_argument("--at-once", type=int, default=48, help="array tasks allowed to run at the same time")
     ask.add_argument("--big-mem-gb", type=int, default=40, help="memory for cells averaging over many draws")
     ask.add_argument("--big-draws", type=int, default=16, help="a cell drawing at least this many winds is big")
-    ask.add_argument("--arms", default=",".join(ARMS), help=f"which arms to run, comma separated: {', '.join(ARMS)}")
+    ask.add_argument("--arms", default=",".join(SWEEP), help=f"which arms to run, comma separated: {', '.join(ARMS)}")
     ask.add_argument("--keep-path", action="store_true", help="record every cell's trajectory in its row")
     ask.add_argument("--dry-run", action="store_true", help="print the cells and do not submit")
     ask.add_argument("overrides", nargs="*", help="after --: run_cell.py flags added to every cell")

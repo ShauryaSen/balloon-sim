@@ -9,8 +9,13 @@
 set -euo pipefail
 
 RECORD=${RECORD:-records/era5_global_jul2021.npz}
-OUT=${OUT:-results/rows-2026-10-23}
+OUT=${OUT:-results/rows-2026-10-24}
 ARMS=${ARMS:-main,distance,calibration,nested}
+#
+# The scouting arm comes first and runs on its own, since it is what decides the task the sweep flies:
+#     ARMS=scout OUT=results/rows-scout ./run_all.sh
+#     uv run scripts/scout.py results/rows-scout/*.jsonl
+# then set BASE_DIRECTION and BASE_GOAL_KM in balloon_sim/cells.py to what it chose and run this again.
 
 say() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 

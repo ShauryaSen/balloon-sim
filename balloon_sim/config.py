@@ -55,7 +55,11 @@ class TaskConfig:
     start_hours: float = 0.0  # when in the record the episode starts
     # random mode: a start drawn inside the allowed area, the goal distance_km away in a random direction
     distance_km: float = 1000.0  # chosen by docs/goal-distance-test-2026-10-22.md
-    direction: Literal["random", "downwind"] = "downwind"  # the goal's bearing: any, or where the start's wind blows
+    direction: Literal["random", "downwind", "crosswind", "upwind"] = "downwind"
+    """Where the goal is put relative to the flow at the start. downwind is carried there by the wind and so
+    needs no steering; upwind needs a level that opposes the mean flow; crosswind a quarter turn off it,
+    with the side drawn per try; random any bearing at all. Which of these the sweep should use is what
+    docs/scouting-rule.md decides"""
     margin_deg: float = 3.0  # start and goal at least this far inside a regional record's edges
     lat_band: tuple[float, float] = (20.0, 50.0)  # launches and goals within these latitudes: summer mid-latitudes
     # fixed mode: these exact coordinates
@@ -82,6 +86,12 @@ class ExperimentConfig:
     """
 
     seeds: tuple[int, ...] = tuple(range(32))
+
+    scout_directions: tuple[str, ...] = ("downwind", "crosswind", "upwind", "random")
+    scout_distances: tuple[float, ...] = (300.0, 600.0, 1000.0, 2000.0, 3000.0)
+    """The scouting arm's grid. It flies only the ceiling and the floor, which is all that is needed to see
+    whether a task has any room in it: where hindsight and a blind plan score the same, no controller can
+    show anything, however good it is"""
 
     goal_distances: tuple[float, ...] = (1000.0, 2000.0, 3000.0)
     """How far downwind the goal is. 1,000 km is the rule-chosen distance hindsight reaches on 27 of 32 seeds;

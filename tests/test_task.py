@@ -67,3 +67,18 @@ def test_launches_stay_in_the_latitude_band():
     for seed in range(20):
         task = draw_task(TaskConfig(), jax.random.key(seed), TRUTH)
         assert 20.0 <= task.start.lat <= 50.0 and 20.0 <= task.goal_lat <= 50.0
+
+
+def test_the_goal_goes_where_the_direction_says():
+    """Wind 10 m/s due east everywhere: downwind puts the goal east, upwind west, crosswind north or south"""
+    uv = jnp.zeros((2, 2, 2, 2, 2)).at[..., 0].set(10.0)
+    east = WindField(jnp.array([0.0, 240.0]), jnp.array([15.0, 20.0]), jnp.array([20.0, 50.0]), jnp.array([120.0, 240.0]), uv)
+    key = jax.random.key(0)
+    goals = {d: draw_task(TaskConfig(direction=d, distance_km=300.0), key, east) for d in ("downwind", "upwind", "crosswind")}
+    along = lambda task: ((task.goal_lon - task.start.lon + 180.0) % 360.0) - 180.0  # degrees east of the start
+
+    assert along(goals["downwind"]) > 0  # with the wind
+    assert along(goals["upwind"]) < 0  # against it
+    # a quarter turn off the flow is mostly north or south, so the goal barely moves along it
+    assert abs(along(goals["crosswind"])) < abs(along(goals["downwind"])) / 2
+    assert abs(goals["crosswind"].goal_lat - goals["crosswind"].start.lat) > 1.0  # but well away in latitude

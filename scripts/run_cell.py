@@ -50,7 +50,9 @@ def parser() -> argparse.ArgumentParser:
     ask.add_argument("--sigma", type=float, required=True, help="the forecast's error, overriding belief.sigma")
     ask.add_argument("--horizon", type=int, help="moves the MPC plans ahead, overriding planner.horizon")
     ask.add_argument("--n-winds", type=int, default=0, help="belief draws a plan is averaged over; 0 is its mean")
-    ask.add_argument("--goal-km", type=float, help="how far downwind the goal is, overriding task.distance_km")
+    ask.add_argument("--goal-km", type=float, help="how far away the goal is, overriding task.distance_km")
+    ask.add_argument("--direction", choices=("downwind", "crosswind", "upwind", "random"),
+                     help="where the goal sits relative to the flow, overriding task.direction")
     ask.add_argument("--belief-scale", type=float, default=1.0,
                      help="what the belief assumes the error is, as a multiple of --sigma; 1 is calibrated")
     ask.add_argument("--nested", action="store_true",
@@ -82,6 +84,8 @@ def build(asked: dict):
         pieces["planner"] = dataclasses.replace(pieces["planner"], horizon=asked["horizon"])
     if asked.get("goal_km") is not None:
         pieces["task"] = dataclasses.replace(pieces["task"], distance_km=asked["goal_km"])
+    if asked.get("direction") is not None:
+        pieces["task"] = dataclasses.replace(pieces["task"], direction=asked["direction"])
     return pieces
 
 
@@ -118,14 +122,16 @@ def main(argv: list[str] | None = None) -> None:
 
     written = row(
         flight, task, controller=asked["controller"], n_winds=n_winds, seed=asked["seed"], seconds=seconds, settings=pieces,
-        extra={"goal_km": task_config.distance_km, "belief_scale": asked["belief_scale"], "nested": asked["nested"]},
+        extra={"goal_km": task_config.distance_km, "direction": task_config.direction,
+               "belief_scale": asked["belief_scale"], "nested": asked["nested"]},
         keep_path=asked["keep_path"],
     )
     Path(asked["out"]).parent.mkdir(parents=True, exist_ok=True)
     write_rows(asked["out"], [written])
     reached = f"move {int(flight.arrived_move):2d}" if bool(flight.arrived) else "   never"
     print(f"{asked['controller']:10s} seed {asked['seed']:3d} sigma {asked['sigma']:5.2f} "
-          f"horizon {planner.horizon:3d} n_winds {n_winds:2d} goal {task_config.distance_km:5.0f} km "
+          f"horizon {planner.horizon:3d} n_winds {n_winds:2d} "
+          f"goal {task_config.distance_km:5.0f} km {task_config.direction:9s} "
           f"scale {asked['belief_scale']:3.1f}  cost {float(flight.cost_km):10.1f} km  "
           f"arrived {reached}  final {float(flight.final_km):8.1f} km  {seconds:6.1f} s")
 

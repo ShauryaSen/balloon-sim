@@ -36,10 +36,15 @@ down on the 1,000 km sweep"""
 BASE_GOAL_KM = 1000.0
 """The goal distance the main arm and every side arm except the distance arm use"""
 
+BASE_DIRECTION = "downwind"
+"""Where the goal sits relative to the flow, for every arm but the scouting one. The scouting arm is what
+decides whether this is the right setting; change it here once it has answered"""
+
 
 class Cell(NamedTuple):
     controller: str  # hindsight, fixed_plan, mpc or mpc_blind
     seed: int
+    direction: str  # where the goal sits relative to the flow: downwind, crosswind, upwind or random
     sigma: float  # the error actually put into the forecast, in m/s
     horizon: int  # for hindsight and the fixed plan, the whole episode: they do not use it
     n_winds: int  # belief draws the plan is averaged over; 0 is the belief's mean
@@ -61,11 +66,11 @@ def main_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) ->
     """
     out: list[Cell] = []
     for seed in experiment.seeds:
-        out.append(Cell("hindsight", seed, 0.0, n_moves, 0, BASE_GOAL_KM, 1.0, False))
+        out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, n_moves, 0, BASE_GOAL_KM, 1.0, False))
         for sigma in _ladder(experiment, fitted_sigma):
-            out.extend(Cell("fixed_plan", seed, sigma, n_moves, n, BASE_GOAL_KM, 1.0, False) for n in experiment.fixed_plan_n_winds)
+            out.extend(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, n, BASE_GOAL_KM, 1.0, False) for n in experiment.fixed_plan_n_winds)
             out.extend(
-                Cell(which, seed, sigma, horizon, n, BASE_GOAL_KM, 1.0, False)
+                Cell(which, seed, BASE_DIRECTION, sigma, horizon, n, BASE_GOAL_KM, 1.0, False)
                 for which, draws in (("mpc", experiment.mpc_n_winds), ("mpc_blind", (0,)))
                 for n in draws
                 for horizon in experiment.horizons
@@ -85,10 +90,10 @@ def distance_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float
         if goal_km == BASE_GOAL_KM:
             continue  # the main arm already flies it
         for seed in experiment.seeds:
-            out.append(Cell("hindsight", seed, 0.0, n_moves, 0, goal_km, 1.0, False))
+            out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, n_moves, 0, goal_km, 1.0, False))
             for sigma in _ladder(experiment, fitted_sigma):
-                out.append(Cell("fixed_plan", seed, sigma, n_moves, 0, goal_km, 1.0, False))
-                out.extend(Cell(which, seed, sigma, BASE_HORIZON, 0, goal_km, 1.0, False) for which in ("mpc", "mpc_blind"))
+                out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, 0, goal_km, 1.0, False))
+                out.extend(Cell(which, seed, BASE_DIRECTION, sigma, BASE_HORIZON, 0, goal_km, 1.0, False) for which in ("mpc", "mpc_blind"))
     return out
 
 
@@ -105,8 +110,8 @@ def calibration_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: fl
             if sigma == 0.0:
                 continue
             for scale in experiment.belief_scales:
-                out.extend(Cell("fixed_plan", seed, sigma, n_moves, n, BASE_GOAL_KM, scale, False) for n in (0, 16))
-                out.extend(Cell("mpc", seed, sigma, BASE_HORIZON, n, BASE_GOAL_KM, scale, False) for n in (0, 16))
+                out.extend(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, n, BASE_GOAL_KM, scale, False) for n in (0, 16))
+                out.extend(Cell("mpc", seed, BASE_DIRECTION, sigma, BASE_HORIZON, n, BASE_GOAL_KM, scale, False) for n in (0, 16))
     return out
 
 
@@ -121,15 +126,41 @@ def nested_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) 
     for seed in experiment.seeds:
         for sigma in loud:
             for n in (1, 4, experiment.nested_pool):
-                out.append(Cell("fixed_plan", seed, sigma, n_moves, n, BASE_GOAL_KM, 1.0, True))
-                out.append(Cell("mpc", seed, sigma, BASE_HORIZON, n, BASE_GOAL_KM, 1.0, True))
+                out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, n, BASE_GOAL_KM, 1.0, True))
+                out.append(Cell("mpc", seed, BASE_DIRECTION, sigma, BASE_HORIZON, n, BASE_GOAL_KM, 1.0, True))
     return out
 
 
-ARMS = {"main": main_arm, "distance": distance_arm, "calibration": calibration_arm, "nested": nested_arm}
+def scout_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> list[Cell]:
+    """Which tasks have any room in them: the ceiling and the floor alone, over every direction and distance.
+
+    A task is worth sweeping only if a controller that knows the wind beats one that is flying blind. Where
+    hindsight and the fixed plan score the same, the wind is doing all the work and no controller can show
+    anything, however good it is; where hindsight cannot reach the goal either, the task is measuring the
+    wind rather than the control. The gap between the two, and hindsight's own reach, are what this arm
+    measures, at one noise level and one horizon. Two controllers over 4 directions and 5 distances is
+    1,280 cells, against 7,904 for the sweep it chooses the setting for.
+
+    docs/scouting-rule.md fixes how the answer is read, and was written before this ran.
+    """
+    out: list[Cell] = []
+    sigma = round(fitted_sigma, 4)  # one level, the record's own error: the sweep varies it, this does not
+    for direction in experiment.scout_directions:
+        for goal_km in experiment.scout_distances:
+            for seed in experiment.seeds:
+                out.append(Cell("hindsight", seed, direction, 0.0, n_moves, 0, goal_km, 1.0, False))
+                out.append(Cell("fixed_plan", seed, direction, sigma, n_moves, 0, goal_km, 1.0, False))
+    return out
 
 
-def cells(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float, arms: tuple[str, ...] = tuple(ARMS)) -> list[Cell]:
+ARMS = {"scout": scout_arm, "main": main_arm, "distance": distance_arm, "calibration": calibration_arm, "nested": nested_arm}
+
+
+SWEEP = ("main", "distance", "calibration", "nested")
+"""The sweep proper: everything except the scouting arm, which is run first and on its own"""
+
+
+def cells(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float, arms: tuple[str, ...] = SWEEP) -> list[Cell]:
     """Every flight the sweep runs, with no two cells describing the same flight. fitted_sigma is the record's
     own day-old error (BeliefConfig.sigma); the sweep's levels are multiples of it"""
     seen: dict[Cell, None] = {}

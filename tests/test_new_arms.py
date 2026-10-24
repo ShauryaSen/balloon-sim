@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import pytest
 
 from balloon_sim.belief import GPBelief, Nested, Readings, forecast
-from balloon_sim.cells import ARMS, BASE_GOAL_KM, cells
+from balloon_sim.cells import ARMS, BASE_GOAL_KM, SWEEP, cells
 from balloon_sim.config import BeliefConfig, ExperimentConfig, TaskConfig
 from balloon_sim.wind import WindField
 
@@ -67,3 +67,22 @@ def test_the_calibration_arm_leaves_the_noise_alone():
 def test_the_main_arm_is_calibrated_and_at_the_base_goal():
     grid = cells(ExperimentConfig(), TaskConfig().n_moves, BeliefConfig().sigma, ("main",))
     assert all(c.belief_scale == 1.0 and c.goal_km == BASE_GOAL_KM and not c.nested for c in grid)
+
+
+def test_the_scouting_arm_flies_only_the_ceiling_and_the_floor():
+    """Its whole point is to be cheap: two controllers, one noise level, one horizon"""
+    grid = cells(ExperimentConfig(), TaskConfig().n_moves, BeliefConfig().sigma, ("scout",))
+    assert {c.controller for c in grid} == {"hindsight", "fixed_plan"}
+    assert {c.sigma for c in grid} == {0.0, round(BeliefConfig().sigma, 4)}  # hindsight is at zero by definition
+
+
+def test_the_scouting_arm_covers_every_direction_and_distance():
+    experiment = ExperimentConfig()
+    grid = cells(experiment, TaskConfig().n_moves, BeliefConfig().sigma, ("scout",))
+    assert {c.direction for c in grid} == set(experiment.scout_directions)
+    assert {c.goal_km for c in grid} == set(experiment.scout_distances)
+
+
+def test_the_sweep_does_not_include_the_scouting_arm():
+    """The scout chooses the sweep's task, so it runs first and on its own"""
+    assert "scout" not in SWEEP

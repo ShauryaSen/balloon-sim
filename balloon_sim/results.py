@@ -10,7 +10,7 @@ One row is one flight. Its columns:
     cost_km               the objective: summed until the balloon arrives, nothing after (the arrival rule)
     arrived, arrived_move whether it ever came within task.arrival_km, and the move it first did (0 if never)
     closest_km, closest_move   the nearest the balloon came to the goal, and after which move (from 1)
-    goal_km               how far the goal was placed, in km
+    goal_km, direction    how far the goal was placed and where, relative to the flow at the start
     belief_scale          what the belief assumed the error was, as a multiple of the real one; 1 is calibrated
     nested                whether the draws were a subset of one shared pool rather than drawn fresh
     path_lat, path_lon, path_altitude_km   the trajectory, when the cell was asked to keep it
