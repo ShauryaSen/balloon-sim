@@ -9,7 +9,8 @@ from balloon_sim.results import best_hindsight, read_rows, row, write_rows
 from balloon_sim.task import Task
 
 TASK = Task(State(jnp.array(30.0), jnp.array(150.0), jnp.array(17.5), jnp.array(0.0)), jnp.array(31.0), jnp.array(151.0))
-FLIGHT = Flight(jnp.zeros(3), TASK.start, jnp.array(1234.5), jnp.array(67.8))
+# a flight that never moves: three moves all at the start, so every move is equally close to the goal
+FLIGHT = Flight(jnp.zeros(3), TASK.start, jnp.array(1234.5), jnp.array(67.8), jnp.array(1234.5), jnp.array(False), jnp.array(0))
 
 
 def test_a_row_flattens_every_setting_and_carries_the_metrics():
@@ -17,6 +18,7 @@ def test_a_row_flattens_every_setting_and_carries_the_metrics():
     assert r["controller"] == "mpc" and r["n_winds"] == 8 and r["seed"] == 3
     assert r["planner.horizon"] == 20 and r["belief.sigma"] == 4.8
     assert r["summed_km"] == 1234.5 and abs(r["final_km"] - 67.8) < 1e-4
+    assert r["cost_km"] == 1234.5 and r["arrived"] is False and r["arrived_move"] == 0
     assert (r["start_lat"], r["goal_lon"]) == (30.0, 151.0)
     assert r["closest_move"] == 1 and r["closest_km"] > 0  # FLIGHT never moves, so every move is equally close
 

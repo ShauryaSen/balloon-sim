@@ -32,7 +32,7 @@ def keyed(rows: list[dict]) -> dict:
 
 def per_move(row: dict, metric: str) -> float:
     """Summed distance as an average per move, so it reads as km; other metrics as they are"""
-    return row[metric] / row["task.n_moves"] if metric == "summed_km" else row[metric]
+    return row[metric] / row["task.n_moves"] if metric in ("summed_km", "cost_km") else row[metric]
 
 
 def compare(a: dict, b: dict, metric: str) -> str:
@@ -60,17 +60,24 @@ def main(argv: list[str] | None = None) -> None:
 
     print(f"{len(rows)} rows, {len(hind)} seeds\n")
     has_closest = all("closest_km" in r for r in hind.values())  # rows written before 2026-10-22 lack it
-    for metric in ("closest_km", "final_km", "summed_km")[0 if has_closest else 1:]:
+    present = [m for m in ("closest_km", "final_km", "summed_km", "cost_km") if all(m in r for r in hind.values())]
+    for metric in present:
         values = [per_move(r, metric) for r in hind.values()]
         print(f"hindsight {metric:11s}: median {st.median(values):6.0f} km, quartiles {np.percentile(values, 25):.0f} to {np.percentile(values, 75):.0f}")
     if has_closest:
         closest = [r["closest_km"] for r in hind.values()]
         print(f"hindsight within 200 km of the goal at some point: {sum(c < 200 for c in closest)}/{len(closest)}; "
               f"median move of closest approach {st.median(r['closest_move'] for r in hind.values()):.0f}")
+    if all("arrived" in r for r in hind.values()):  # the arrival rule: how often, and how soon
+        reached = [r for r in hind.values() if r["arrived"]]
+        print(f"hindsight arrived (within task.arrival_km, ending the episode): {len(reached)}/{len(hind)}"
+              + (f"; median move {st.median(r['arrived_move'] for r in reached):.0f}" if reached else ""))
     print()
 
-    for metric in ("summed_km", "final_km"):
-        what = "average distance over the episode" if metric == "summed_km" else "final distance"
+    for metric in [m for m in ("cost_km", "summed_km", "final_km") if m in present]:
+        what = {"cost_km": "the objective (distance summed until arrival)",
+                "summed_km": "average distance over the episode",
+                "final_km": "final distance"}[metric]
         print(f"## {what}, km above hindsight, paired mean over seeds\n")
         print("| controller | " + " | ".join(f"σ={s:g}" for s in sigmas) + " |")
         print("|---|" + "---|" * len(sigmas))
