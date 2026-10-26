@@ -178,6 +178,14 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     the goal and get pushed back, or circle it?" cannot be answered from a finished sweep at all, which is
     what happened to the 1,000 km sweep.
 
+44. **The task is 2,000 km downwind**, chosen by `docs/scouting-rule.md` from twenty candidates, the only
+    one both reachable (hindsight arrives on 25 of 32) and not free (a blind plan is 56% worse on a typical
+    seed, and arrives on 10 of 32). 1,000 km downwind, which the goal-distance rule picked in October, turned
+    out to be a free ride once the episode ended on arrival: the wind carried every controller there by move
+    5 to 8 and they scored within a tenth of a percent of each other. Crosswind, upwind and random goals are
+    unreachable at every distance tried, 300 km included, because the levels oppose each other at only 58% of
+    points: an altitude-only balloon in this record goes downwind or nowhere.
+
 ## Open
 
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.

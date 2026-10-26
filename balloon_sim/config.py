@@ -54,7 +54,7 @@ class TaskConfig:
 
     start_hours: float = 0.0  # when in the record the episode starts
     # random mode: a start drawn inside the allowed area, the goal distance_km away in a random direction
-    distance_km: float = 1000.0  # chosen by docs/goal-distance-test-2026-10-22.md
+    distance_km: float = 2000.0  # chosen by docs/scouting-rule.md; nearer, the wind carries the balloon there unaided
     direction: Literal["random", "downwind", "crosswind", "upwind"] = "downwind"
     """Where the goal is put relative to the flow at the start. downwind is carried there by the wind and so
     needs no steering; upwind needs a level that opposes the mean flow; crosswind a quarter turn off it,

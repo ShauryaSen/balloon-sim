@@ -82,6 +82,49 @@ Arrival rate is worth watching as an outcome in its own right. Under the arrival
 factor of fifty between a flight that arrives and one that does not, where "did it arrive" is bounded and
 reads directly. The probe had hindsight at 8 of 8 and the fixed plan at 5 of 8.
 
-## Result
+## Result (Slurm arrays 577661 and 577662, rows in `results/rows-scout/`, all 1,280 cells, no failures)
 
-To be filled in by `scripts/scout.py` when the arm has run.
+```
+direction    goal   h.arr  move  f.arr   hindsight     median gap  seeds    mean gap  verdict
+crosswind     300   20/32    15   7/32       36861     16997  75%  20/32       33440  unreachable
+crosswind     600   16/32    20   6/32       45438     17392  61%  22/32       29510  unreachable
+crosswind    1000   13/32    25   5/32       52036     14866  43%  21/32       23030  unreachable
+crosswind    2000   12/32    36   2/32       76529     17160  22%  15/32       30921  unreachable
+crosswind    3000    6/32    37   2/32      114897      9729   9%   6/32       16912  unreachable
+downwind      300   32/32     2  31/32         460         0   0%   1/32        2567  too free
+downwind      600   31/32     4  26/32        3795        13   1%   7/32       13105  too free
+downwind     1000   29/32     8  20/32        9273       845  16%  15/32       28835  too free
+downwind     2000   25/32    20  10/32       29916     21016  56%  22/32       38287  QUALIFIES
+downwind     3000   17/32    25   4/32       59287     27489  58%  23/32       34615  unreachable
+random        300   22/32     9  10/32       35769     23118  55%  19/32       36918  unreachable
+random        600   19/32    12   9/32       46028     11260  23%  15/32       27558  unreachable
+random       1000   16/32    21   7/32       49539     17623  35%  20/32       28413  unreachable
+random       2000   15/32    28   5/32       83732     18581  27%  16/32       27822  unreachable
+random       3000   12/32    33   3/32      117363     17667  15%  11/32       27480  unreachable
+upwind        300   20/32    19  10/32       41923     20683  55%  24/32       31829  unreachable
+upwind        600   16/32    23   6/32       52606     17883  54%  20/32       34134  unreachable
+upwind       1000   12/32    21   3/32       62950     17665  36%  18/32       33170  unreachable
+upwind       2000    8/32    39   1/32       92307     22239  30%  20/32       26991  unreachable
+upwind       3000    4/32    40   1/32      137336     12117   8%   9/32       22472  unreachable
+```
+
+By the rule, **downwind at 2,000 km** is chosen: the only one of the twenty that is both reachable and not
+free. Hindsight arrives on 25 of 32 seeds at a median move 20 of 50, so there are twenty moves of decisions
+in an episode; the fixed plan arrives on 10. The median gap is 21,016 km, 56% above hindsight on a typical
+seed, material on 22 of 32. `BASE_GOAL_KM` and `TaskConfig.distance_km` are set to it.
+
+Two things the table says beyond the choice.
+
+**An altitude-only balloon cannot go anywhere but downwind in this record.** Crosswind, upwind and random
+fail the reach threshold at every distance tried, 300 km included, where hindsight gets 20, 20 and 22 of 32.
+This is the wind report's number in another form: the levels oppose each other at only 58% of points, so a
+goal off the flow usually has no level that can reach it. It is a statement about what the vehicle can do,
+not a failed experiment, and belongs in the write-up.
+
+**The free ride ends between 1,000 and 2,000 km.** Along the downwind column the arrival move runs 2, 4, 8,
+20, and the gap 0%, 1%, 16%, 56%. Downwind was never the wrong choice; 1,000 km was simply short enough that
+the wind did the work. At 2,000 km the flow at launch is no longer the flow two and a half days later, so
+staying in the right current becomes a decision.
+
+Upwind at 300 km is worth a note: it had the largest material-gap count in the table, 24 of 32, and missed
+only on reach at 20 of 32. If a harder steering task is ever wanted, a shorter upwind goal is where to look.

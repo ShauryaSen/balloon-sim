@@ -33,12 +33,13 @@ BASE_HORIZON = 20
 """The horizon the side arms hold fixed: 60 h, the longest that was ever detectably better than the next one
 down on the 1,000 km sweep"""
 
-BASE_GOAL_KM = 1000.0
-"""The goal distance the main arm and every side arm except the distance arm use"""
+BASE_GOAL_KM = 2000.0
+"""The goal distance the main arm and every side arm except the distance arm use. Chosen by the scouting
+arm (docs/scouting-rule.md): the only task of twenty that is both reachable and not free"""
 
 BASE_DIRECTION = "downwind"
-"""Where the goal sits relative to the flow, for every arm but the scouting one. The scouting arm is what
-decides whether this is the right setting; change it here once it has answered"""
+"""Where the goal sits relative to the flow, for every arm but the scouting one. The scouting arm kept it:
+crosswind, upwind and random were unreachable at every distance it tried, even 300 km"""
 
 
 class Cell(NamedTuple):
