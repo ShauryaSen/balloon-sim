@@ -28,16 +28,21 @@ uv run pytest -q
 say "3. can the balloon hold a point in this record at all?"
 uv run scripts/wind_report.py "$RECORD" --lat 20 50 | tee results/wind-report.txt
 
-say "4. one cell of each controller, to see it fly before 8,000 of them do"
+# the task the sweep will actually fly, read from the config rather than written out here, so these cells
+# cannot quietly go on testing a task the sweep has moved away from
+GOAL=$(uv run python -c "from balloon_sim.cells import BASE_GOAL_KM, BASE_DIRECTION; print(BASE_GOAL_KM, BASE_DIRECTION)")
+read -r GOAL_KM DIRECTION <<< "$GOAL"
+
+say "4. one cell of each controller at ${GOAL_KM} km ${DIRECTION}, to see it fly before 8,000 of them do"
 for CONTROLLER in hindsight fixed_plan mpc mpc_blind; do
   uv run scripts/run_cell.py --controller "$CONTROLLER" --seed 0 --sigma 3.2 --horizon 20 \
-    --n-winds 0 --goal-km 1000 --keep-path --out results/smoke.jsonl
+    --n-winds 0 --goal-km "$GOAL_KM" --direction "$DIRECTION" --keep-path --out results/smoke.jsonl
 done
 say "   and one with a miscalibrated belief, and one with nested draws"
 uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 4 \
-  --goal-km 1000 --belief-scale 2.0 --out results/smoke.jsonl
+  --goal-km "$GOAL_KM" --direction "$DIRECTION" --belief-scale 2.0 --out results/smoke.jsonl
 uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 4 \
-  --goal-km 1000 --nested --nested-pool 16 --out results/smoke.jsonl
+  --goal-km "$GOAL_KM" --direction "$DIRECTION" --nested --nested-pool 16 --out results/smoke.jsonl
 
 say "5. the grid"
 uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --dry-run
