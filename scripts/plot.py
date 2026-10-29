@@ -55,12 +55,15 @@ def colour(controller: str, n_winds: int) -> str:
     return COLOURS[{0: 0, 1: 1, 4: 2, 16: 3, 64: 4}.get(n_winds, 0)]
 
 
+NAMES = {"fixed_plan": "fixed plan", "mpc": "MPC", "mpc_blind": "MPC not learning"}
+
+
 def label(controller: str, n_winds: int) -> str:
     """What a line is called: hindsight reads the truth, so its draws mean nothing"""
     if controller == "hindsight":
         return "hindsight (best search on the true wind)"
     drawn = "mean" if n_winds == 0 else f"{n_winds} draws"
-    return f"{'fixed plan' if controller == 'fixed_plan' else 'MPC'}, {drawn}"
+    return f"{NAMES.get(controller, controller)}, {drawn}"
 
 
 def series(rows: list[dict], horizon: int) -> dict[tuple[str, int], dict[float, dict[int, float]]]:

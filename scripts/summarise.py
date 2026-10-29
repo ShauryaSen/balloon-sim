@@ -71,6 +71,7 @@ def main(argv: list[str] | None = None) -> None:
     horizons = sorted({k[1] for k in by if k[0] == "mpc"})
     mpc_draws = sorted({k[2] for k in by if k[0] == "mpc"})
     fixed_draws = sorted({k[2] for k in by if k[0] == "fixed_plan"})
+    blind_horizons = sorted({k[1] for k in by if k[0] == "mpc_blind"})
 
     print(f"{len(rows)} rows, {len(hind)} seeds\n")
     has_closest = all("closest_km" in r for r in hind.values())  # rows written before 2026-10-22 lack it
@@ -97,6 +98,8 @@ def main(argv: list[str] | None = None) -> None:
         print("|---|" + "---|" * len(sigmas))
         lines = [(f"fixed plan, {n} draws", ("fixed_plan", None, n)) for n in fixed_draws]
         lines += [(f"MPC, horizon {h}, {n} draws", ("mpc", h, n)) for h in horizons for n in mpc_draws]
+        # the same controller without its readings: replanning on the forecast alone
+        lines += [(f"MPC not learning, horizon {h}, mean", ("mpc_blind", h, 0)) for h in blind_horizons]
         for name, (c, h, n) in lines:
             cells = []
             for s in sigmas:
@@ -116,6 +119,20 @@ def main(argv: list[str] | None = None) -> None:
     for s in sigmas:
         for h in horizons:
             print(f"  sigma {s:5g}  H{h:<2d}  N{mpc_draws[-1]} - N0: {compare(by[('mpc', h, mpc_draws[-1], s)], by[('mpc', h, 0, s)], metric)}")
+    if blind_horizons:
+        print("\nreadings: MPC minus the same controller not learning from them, on the mean")
+        print("  below zero, what the balloon learned from its own anemometer was worth")
+        for s in sigmas:
+            for h in blind_horizons:
+                if ("mpc", h, 0, s) in by and ("mpc_blind", h, 0, s) in by:
+                    print(f"  sigma {s:5g}  H{h:<2d}: {compare(by[('mpc', h, 0, s)], by[('mpc_blind', h, 0, s)], metric)}")
+        print("\nreplanning alone: MPC not learning, minus the fixed plan, both on the mean")
+        print("  below zero, what re-solving every move was worth without knowing any more than the forecast said")
+        for s in sigmas:
+            for h in blind_horizons:
+                if ("mpc_blind", h, 0, s) in by and ("fixed_plan", None, 0, s) in by:
+                    print(f"  sigma {s:5g}  H{h:<2d}: {compare(by[('mpc_blind', h, 0, s)], by[('fixed_plan', None, 0, s)], metric)}")
+
     print("\ndraws: fixed plan with the most draws minus the fixed plan on the mean")
     for s in sigmas:
         print(f"  sigma {s:5g}  N{fixed_draws[-1]} - N0: {compare(by[('fixed_plan', None, fixed_draws[-1], s)], by[('fixed_plan', None, 0, s)], metric)}")
