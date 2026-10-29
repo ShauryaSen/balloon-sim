@@ -44,7 +44,9 @@ toward a distant goal at the last move can end nearer than one that reached a ne
 
 SUMMED = ("summed_km", "cost_km")  # shown as an average per move, since a sum over 50 moves is hard to read
 INK, COLOURS = "#12161b", ("#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00")
-STYLE = {"hindsight": "-", "mpc": "-", "fixed_plan": "--"}
+STYLE = {"hindsight": "-", "mpc": "-", "mpc_blind": ":", "fixed_plan": "--"}
+"""A line per controller: solid replans and learns, dotted replans without learning, dashed commits once.
+Anything a later sweep adds falls back to solid rather than stopping the figure"""
 """A line's colour says how many winds it planned on, its style which controller it is: hindsight black,
 MPC solid, the fixed plan dashed, so the same draw count can be compared across the two"""
 
@@ -104,7 +106,7 @@ def draw_lines(lines: dict, sigmas: list[float], metric: str, into: Path, title:
     figure, panel = plt.subplots(figsize=(7.0, 4.6), dpi=200)
     for slot, (which, line) in enumerate(sorted(lines.items())):
         means, errors = at_every_sigma(line, sigmas, metric)
-        panel.errorbar(sigmas, means, yerr=errors, label=label(*which), color=colour(*which), linestyle=STYLE[which[0]],
+        panel.errorbar(sigmas, means, yerr=errors, label=label(*which), color=colour(*which), linestyle=STYLE.get(which[0], "-"),
                        marker="o", markersize=4, capsize=3, linewidth=1.5)
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
     panel.set_ylabel(METRICS[metric])
@@ -186,7 +188,7 @@ def draw_score(lines: dict, sigmas: list[float], metric: str, into: Path, title:
             values = np.array(scores, dtype=float)
             q = np.percentile(values, [25, 50, 75]) if values.size >= 4 else np.array([np.nan] * 3)
             medians.append(q[1]); low.append(q[1] - q[0]); high.append(q[2] - q[1])
-        panel.errorbar(sigmas, medians, yerr=[low, high], label=label(*which), color=colour(*which), linestyle=STYLE[which[0]],
+        panel.errorbar(sigmas, medians, yerr=[low, high], label=label(*which), color=colour(*which), linestyle=STYLE.get(which[0], "-"),
                        marker="o", markersize=4, capsize=3, linewidth=1.5)
     panel.axhline(1.0, color="#999999", linewidth=0.9, linestyle=":", zorder=0)  # as good as knowing the wind
     panel.axhline(0.0, color="#999999", linewidth=0.9, zorder=0)  # no better than a blind plan
