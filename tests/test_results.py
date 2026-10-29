@@ -65,6 +65,20 @@ def test_an_arm_is_chosen_before_anything_is_summarised():
     assert one_arm(rows, 2000.0, nested=True) == rows[3:4]
 
 
+def test_hindsight_belongs_to_every_arm_at_its_goal():
+    """It plans on the truth, so a miscalibrated belief and nested draws are settings it never reads: the
+    side arms do not fly their own hindsight and take the one at their goal distance"""
+    from balloon_sim.results import one_arm
+
+    rows = [
+        {"controller": "hindsight", "seed": 0, "goal_km": 2000.0, "belief_scale": 1.0, "nested": False},
+        {"controller": "hindsight", "seed": 0, "goal_km": 3000.0, "belief_scale": 1.0, "nested": False},
+    ]
+    assert one_arm(rows, 2000.0, belief_scale=0.5) == rows[:1]
+    assert one_arm(rows, 2000.0, nested=True) == rows[:1]
+    assert one_arm(rows, 3000.0, belief_scale=2.0) == rows[1:]
+
+
 def test_rows_from_before_the_arms_existed_are_kept():
     """A sweep with one arm is one arm; only a sweep with several has to choose"""
     from balloon_sim.results import one_arm

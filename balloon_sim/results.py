@@ -120,13 +120,15 @@ def one_arm(rows: list[dict], goal_km: float | None = None, belief_scale: float 
     is one arm; it is only a sweep with several that has to choose.
     """
     goal_km = BASE_GOAL_KM if goal_km is None else goal_km
-    return [
-        r
-        for r in rows
-        if r.get("goal_km", goal_km) == goal_km
-        and r.get("belief_scale", belief_scale) == belief_scale
-        and bool(r.get("nested", nested)) == nested
-    ]
+
+    def belongs(r: dict) -> bool:
+        if r.get("goal_km", goal_km) != goal_km:
+            return False  # a different goal is a different task, for every controller including hindsight
+        if r["controller"] == "hindsight":
+            return True  # it reads the truth, so neither the belief's calibration nor its draws reach it
+        return r.get("belief_scale", belief_scale) == belief_scale and bool(r.get("nested", nested)) == nested
+
+    return [r for r in rows if belongs(r)]
 
 
 def best_hindsight(rows: list[dict]) -> list[dict]:
