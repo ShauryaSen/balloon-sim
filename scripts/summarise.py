@@ -120,10 +120,16 @@ def main(argv: list[str] | None = None) -> None:
     for s in sigmas:
         for short, long in zip(horizons, horizons[1:]):
             print(f"  sigma {s:5g}  H{short:<2d} - H{long:<2d}: {compare(by[('mpc', short, 0, s)], by[('mpc', long, 0, s)], metric)}")
-    print("\ndraws: MPC with the most draws minus MPC on the mean, at each horizon")
-    for s in sigmas:
-        for h in horizons:
-            print(f"  sigma {s:5g}  H{h:<2d}  N{mpc_draws[-1]} - N0: {compare(by[('mpc', h, mpc_draws[-1], s)], by[('mpc', h, 0, s)], metric)}")
+    # an arm need not carry every draw count: the nested one starts at 1 and the distance ones have only the
+    # mean, so each comparison is against the fewest draws that arm actually flew, and is skipped when that is
+    # the same cell as the most
+    if len(mpc_draws) > 1:
+        print(f"\ndraws: MPC with {mpc_draws[-1]} draws minus MPC with {mpc_draws[0]}, at each horizon")
+        for s in sigmas:
+            for h in horizons:
+                most, fewest = by.get(("mpc", h, mpc_draws[-1], s)), by.get(("mpc", h, mpc_draws[0], s))
+                if most and fewest:
+                    print(f"  sigma {s:5g}  H{h:<2d}  N{mpc_draws[-1]} - N{mpc_draws[0]}: {compare(most, fewest, metric)}")
     if blind_horizons:
         print("\nreadings: MPC minus the same controller not learning from them, on the mean")
         print("  below zero, what the balloon learned from its own anemometer was worth")
@@ -135,15 +141,23 @@ def main(argv: list[str] | None = None) -> None:
         print("  below zero, what re-solving every move was worth without knowing any more than the forecast said")
         for s in sigmas:
             for h in blind_horizons:
-                if ("mpc_blind", h, 0, s) in by and ("fixed_plan", None, 0, s) in by:
-                    print(f"  sigma {s:5g}  H{h:<2d}: {compare(by[('mpc_blind', h, 0, s)], by[('fixed_plan', None, 0, s)], metric)}")
+                if ("mpc_blind", h, 0, s) in by and ("fixed_plan", None, fixed_draws[0], s) in by:
+                    print(f"  sigma {s:5g}  H{h:<2d}: {compare(by[('mpc_blind', h, 0, s)], by[('fixed_plan', None, fixed_draws[0], s)], metric)}")
 
-    print("\ndraws: fixed plan with the most draws minus the fixed plan on the mean")
-    for s in sigmas:
-        print(f"  sigma {s:5g}  N{fixed_draws[-1]} - N0: {compare(by[('fixed_plan', None, fixed_draws[-1], s)], by[('fixed_plan', None, 0, s)], metric)}")
-    print("\nreplanning: MPC (horizon 20, mean) minus the fixed plan (mean)")
-    for s in sigmas:
-        print(f"  sigma {s:5g}: {compare(by[('mpc', 20, 0, s)], by[('fixed_plan', None, 0, s)], metric)}")
+    if len(fixed_draws) > 1:
+        print(f"\ndraws: the fixed plan with {fixed_draws[-1]} draws minus the fixed plan with {fixed_draws[0]}")
+        for s in sigmas:
+            most, fewest = by.get(("fixed_plan", None, fixed_draws[-1], s)), by.get(("fixed_plan", None, fixed_draws[0], s))
+            if most and fewest:
+                print(f"  sigma {s:5g}  N{fixed_draws[-1]} - N{fixed_draws[0]}: {compare(most, fewest, metric)}")
+
+    base = horizons[len(horizons) // 2] if horizons else None  # the middle horizon the arm flew
+    if base is not None:
+        print(f"\nreplanning: MPC (horizon {base}, {mpc_draws[0]} draws) minus the fixed plan ({fixed_draws[0]} draws)")
+        for s in sigmas:
+            mpc_cell, floor = by.get(("mpc", base, mpc_draws[0], s)), by.get(("fixed_plan", None, fixed_draws[0], s))
+            if mpc_cell and floor:
+                print(f"  sigma {s:5g}: {compare(mpc_cell, floor, metric)}")
 
 
 if __name__ == "__main__":
