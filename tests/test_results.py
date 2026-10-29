@@ -85,3 +85,19 @@ def test_rows_from_before_the_arms_existed_are_kept():
 
     old = [{"controller": "mpc", "seed": 0}, {"controller": "fixed_plan", "seed": 1}]
     assert one_arm(old) == old
+
+
+def test_a_replanning_controller_is_keyed_by_its_horizon():
+    """mpc_blind replans, so its horizons are four different controllers and must not share a key"""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from summarise import keyed
+
+    rows = [
+        {"controller": "mpc_blind", "seed": 0, "n_winds": 0, "belief.sigma": 3.2, "planner.horizon": h}
+        for h in (5, 10, 20, 50)
+    ]
+    assert len(keyed(rows)) == 4
+    assert all(("mpc_blind", h, 0, 3.2) in keyed(rows) for h in (5, 10, 20, 50))

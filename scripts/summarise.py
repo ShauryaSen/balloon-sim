@@ -22,10 +22,15 @@ from balloon_sim.results import best_hindsight, one_arm, read_rows
 
 
 def keyed(rows: list[dict]) -> dict:
-    """{(controller, horizon or None, n_winds, sigma): {seed: row}}; hindsight and the fixed plan carry no horizon"""
+    """{(controller, horizon or None, n_winds, sigma): {seed: row}}
+
+    Hindsight and the fixed plan plan the whole episode at once, so a horizon does not describe them and they
+    carry None. Every controller that replans carries its own, mpc_blind included: without that its four
+    horizons land on one key and overwrite each other seed by seed.
+    """
     out: dict = {}
     for r in rows:
-        horizon = r["planner.horizon"] if r["controller"] == "mpc" else None
+        horizon = r["planner.horizon"] if r["controller"].startswith("mpc") else None
         sigma = 0.0 if r["controller"] == "hindsight" else round(r["belief.sigma"], 4)
         out.setdefault((r["controller"], horizon, r["n_winds"], sigma), {})[r["seed"]] = r
     return out
