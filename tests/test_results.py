@@ -47,3 +47,27 @@ def test_hindsight_becomes_the_best_clairvoyant_flight_of_its_seed():
     ]
     hind = [r for r in best_hindsight(rows) if r["controller"] == "hindsight"][0]
     assert (hind["summed_km"], hind["final_km"]) == (400.0, 90.0)  # each metric its own best, noisy flights ignored
+
+
+def test_an_arm_is_chosen_before_anything_is_summarised():
+    """The arms share every other setting, so rows from two of them must never land on one key"""
+    from balloon_sim.results import one_arm
+
+    rows = [
+        {"controller": "mpc", "seed": 0, "goal_km": 2000.0, "belief_scale": 1.0, "nested": False},
+        {"controller": "mpc", "seed": 0, "goal_km": 3000.0, "belief_scale": 1.0, "nested": False},
+        {"controller": "mpc", "seed": 0, "goal_km": 2000.0, "belief_scale": 2.0, "nested": False},
+        {"controller": "mpc", "seed": 0, "goal_km": 2000.0, "belief_scale": 1.0, "nested": True},
+    ]
+    assert one_arm(rows, 2000.0) == rows[:1]
+    assert one_arm(rows, 3000.0) == rows[1:2]
+    assert one_arm(rows, 2000.0, belief_scale=2.0) == rows[2:3]
+    assert one_arm(rows, 2000.0, nested=True) == rows[3:4]
+
+
+def test_rows_from_before_the_arms_existed_are_kept():
+    """A sweep with one arm is one arm; only a sweep with several has to choose"""
+    from balloon_sim.results import one_arm
+
+    old = [{"controller": "mpc", "seed": 0}, {"controller": "fixed_plan", "seed": 1}]
+    assert one_arm(old) == old

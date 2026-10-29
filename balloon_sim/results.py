@@ -26,6 +26,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
+from balloon_sim.cells import BASE_GOAL_KM
 from balloon_sim.dynamics import distance_km
 from balloon_sim.episode import Flight
 from balloon_sim.task import Task
@@ -105,6 +106,27 @@ def read_rows(paths: list[str | Path]) -> list[dict]:
 
 
 CLAIRVOYANT_METRICS = ("summed_km", "final_km", "closest_km", "cost_km")
+
+
+def one_arm(rows: list[dict], goal_km: float | None = None, belief_scale: float = 1.0, nested: bool = False) -> list[dict]:
+    """The rows of a single arm of the sweep: one goal distance, one belief calibration, draws fresh or nested.
+
+    The arms share controller names, horizons, draw counts and noise levels, so a row is only identified by
+    all of its settings together. A summary that groups on the controller alone silently mixes cells that
+    differ in how far the goal was or in how wrong the belief was, and the later ones overwrite the earlier
+    ones seed by seed. Every reader picks an arm first.
+
+    Rows written before an arm existed do not carry its column. Those are kept, since a sweep with one arm
+    is one arm; it is only a sweep with several that has to choose.
+    """
+    goal_km = BASE_GOAL_KM if goal_km is None else goal_km
+    return [
+        r
+        for r in rows
+        if r.get("goal_km", goal_km) == goal_km
+        and r.get("belief_scale", belief_scale) == belief_scale
+        and bool(r.get("nested", nested)) == nested
+    ]
 
 
 def best_hindsight(rows: list[dict]) -> list[dict]:

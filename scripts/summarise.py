@@ -17,7 +17,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.results import best_hindsight, read_rows
+from balloon_sim.cells import BASE_GOAL_KM
+from balloon_sim.results import best_hindsight, one_arm, read_rows
 
 
 def keyed(rows: list[dict]) -> dict:
@@ -46,11 +47,24 @@ def compare(a: dict, b: dict, metric: str) -> str:
     return f"{d.mean():+7.0f} km [{d.mean() - half:+.0f}, {d.mean() + half:+.0f}]  a lower on {(d < 0).sum()}/{d.size}  -> {verdict}"
 
 
+def arm(ask: argparse.ArgumentParser) -> None:
+    """Which arm of the sweep to read. The arms overlap in every other setting, so one must be chosen"""
+    ask.add_argument("--goal-km", type=float, default=None, help=f"goal distance (default {BASE_GOAL_KM:g}, the main arm)")
+    ask.add_argument("--belief-scale", type=float, default=1.0, help="what the belief assumed the error was, as a multiple")
+    ask.add_argument("--nested", action="store_true", help="read the nested-draw arm instead of the fresh-draw one")
+
+
 def main(argv: list[str] | None = None) -> None:
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ask.add_argument("rows", nargs="+")
+    arm(ask)
     asked = ask.parse_args(argv)
-    rows = best_hindsight(read_rows(asked.rows))  # hindsight: the best search found on the true wind
+    chosen = one_arm(read_rows(asked.rows), asked.goal_km, asked.belief_scale, asked.nested)
+    if not chosen:
+        sys.exit("no rows in that arm; --goal-km, --belief-scale and --nested pick one")
+    print(f"# arm: goal {asked.goal_km or BASE_GOAL_KM:g} km, belief scale {asked.belief_scale:g}, "
+          f"draws {'nested' if asked.nested else 'fresh'}")
+    rows = best_hindsight(chosen)  # hindsight: the best search found on the true wind
     by = keyed(rows)
     hind = by[("hindsight", None, 0, 0.0)]
     sigmas = sorted({k[3] for k in by if k[0] != "hindsight"})
