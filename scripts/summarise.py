@@ -106,7 +106,7 @@ def main(argv: list[str] | None = None) -> None:
 
     for metric in [m for m in ("cost_km", "summed_km", "final_km") if m in present]:
         what = {"cost_km": "the objective (distance summed until arrival)",
-                "summed_km": "average distance over the episode",
+                "summed_km": "distance to the goal, summed over the moves",
                 "final_km": "final distance"}[metric]
         print(f"## {what}, km above hindsight, paired mean over seeds\n")
         print("| controller | " + " | ".join(f"σ={s:g}" for s in sigmas) + " |")
@@ -125,7 +125,7 @@ def main(argv: list[str] | None = None) -> None:
         print()
 
     metric = "summed_km"
-    print("## paired comparisons, average distance over the episode\n")
+    print("## paired comparisons, distance to the goal summed over the moves\n")
     print("horizon: each horizon minus the next longer one, MPC on the mean")
     for s in sigmas:
         for short, long in zip(horizons, horizons[1:]):

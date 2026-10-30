@@ -3,7 +3,9 @@
 Copies from `figures/2026-10-24/` (goal 2,000 km downwind, 32 seeds), in the order to present them. Numbers
 behind every claim: `docs/results-2026-10-29.md`. Everything here is on `cost_km`, the objective as the last
 meeting redefined it: distance summed until the first time the balloon is within 200 km of the goal, nothing
-counted after that. The old figures were on `summed_km`, which kept counting forever, so these are not
+counted after that, in km summed over the episode. Figures made before 2026-10-30 divided that by the
+50-move budget and called it an average distance, which is the same comparison on a different axis, but
+wrong as a description for a flight that arrived early and never flew the rest of the budget. The old figures were on `summed_km`, which kept counting forever, so these are not
 directly comparable to the 2026-10-23 set.
 
 The task is harder than last time, and it was picked rather than chosen: twenty candidates scored against a
@@ -21,7 +23,7 @@ or nowhere.
    balloon can be asked to do before any controller is compared. (`scouting.png`)
 1. **one_flight**: seed 9 at the real forecast error (3.2 m/s). All three are carried west on the same
    flow; hindsight and MPC both turn down into the ring at 51 h and the fixed plan sails past to the north
-   and never arrives, at 1,142 km on average against their 335. Solid is the episode, faint is what was
+   and never arrives, at 57,097 km against their 16,800. Solid is the episode, faint is what was
    flown after the balloon was already inside the 200 km ring, which costs nothing. One seed, an
    illustration, not evidence. (`flight_seed9_sigma3.2.png`; seeds 3 and 0 are drawn too, 0 being a day
    nothing reaches the goal, hindsight included)
@@ -59,8 +61,8 @@ or nowhere.
    (`plain_dots_cost_km_h20.png`)
 7. **what_replanning_is_worth**, new this round: MPC minus the fixed plan, both planning on the belief's
    mean, so the only difference is replanning. Zero at a perfect forecast and slightly positive at horizons
-   5 and 10, which is myopia costing more than a wrong forecast. It falls to -559 km at 3.2 m/s and then
-   comes back to about -200 km. Replanning pays most where the forecast is wrong enough to matter but not so
+   5 and 10, which is myopia costing more than a wrong forecast. It falls to -28,524 km at 3.2 m/s and then
+   comes back to about -21,600 km. Replanning pays most where the forecast is wrong enough to matter but not so
    wrong that what you learn is also wrong. (`replanning_cost_km_n0.png`)
 
 Read 2 and 7 together: replanning is worth hundreds of km, and the balloon's own wind readings are worth

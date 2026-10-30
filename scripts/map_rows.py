@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> None:
         flights[controller] = row
 
     any_row = next(iter(flights.values()))
-    radius, n = any_row["task.arrival_km"], any_row["task.n_moves"]
+    radius = any_row["task.arrival_km"]
     step_hours = any_row["balloon.step_hours"]
     start_lat, start_lon = any_row["start_lat"], any_row["start_lon"]
     goal_lat, goal_lon_raw = any_row["goal_lat"], any_row["goal_lon"]
@@ -90,10 +90,9 @@ def main(argv: list[str] | None = None) -> None:
         altitude = np.concatenate([[row["path_altitude_km"][0]], row["path_altitude_km"]])
         hours = np.arange(len(lon)) * step_hours
         counted = int(row["arrived_move"]) + 1 if row.get("arrived") else len(lon)
-        average = row["cost_km"] / n
         ended = f"arrived at {hours[counted - 1]:.0f} h" if row.get("arrived") else "never arrived"
         where.plot(lon[:counted], lat[:counted], color=colour, linestyle=style, linewidth=1.6,
-                   label=f"{NAMES.get(controller, controller)}: {average:.0f} km on average, {ended}")
+                   label=f"{NAMES.get(controller, controller)}: {row['cost_km']:,.0f} km, {ended}")
         when.plot(hours[:counted], altitude[:counted], color=colour, linestyle=style, linewidth=1.4)
         if counted < len(lon):  # flown after the episode ended, and charged nothing
             where.plot(lon[counted - 1:], lat[counted - 1:], color=colour, linestyle=style, linewidth=1.0, alpha=0.25)
@@ -128,7 +127,7 @@ def main(argv: list[str] | None = None) -> None:
     print(f"wrote {path}")
     for controller, row in flights.items():
         reached = f"move {int(row['arrived_move']):2d}" if row.get("arrived") else "  never"
-        print(f"  {NAMES.get(controller, controller):18s} objective {row['cost_km'] / n:6.0f} km/move, "
+        print(f"  {NAMES.get(controller, controller):18s} objective {row['cost_km']:9,.0f} km, "
               f"closest {row['closest_km']:6.0f} km, arrived {reached}")
 
 

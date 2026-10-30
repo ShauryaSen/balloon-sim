@@ -3,8 +3,8 @@
 
 hindsight closest_km : median    158 km, quartiles 113 to 198
 hindsight final_km   : median    632 km, quartiles 361 to 1600
-hindsight summed_km  : median    829 km, quartiles 651 to 983
-hindsight cost_km    : median    494 km, quartiles 339 to 691
+hindsight summed_km  : median  41427 km, quartiles 32530 to 49168
+hindsight cost_km    : median  24693 km, quartiles 16943 to 34542
 hindsight within 200 km of the goal at some point: 25/32; median move of closest approach 30
 hindsight arrived (within task.arrival_km, ending the episode): 25/32; median move 20
 
@@ -12,19 +12,19 @@ hindsight arrived (within task.arrival_km, ending the episode): 25/32; median mo
 
 | controller | σ=0.8 | σ=1.6 | σ=3.2 | σ=6.4 | σ=12.8 |
 |---|---|---|---|---|---|
-| fixed plan, 0 draws | 392 | 503 | 766 | 824 | 1075 |
-| fixed plan, 16 draws | 140 | 251 | 633 | 1098 | 1172 |
-| MPC, horizon 20, 0 draws | 76 | 126 | 342 | 613 | 884 |
-| MPC, horizon 20, 16 draws | 81 | 111 | 416 | 566 | 695 |
+| fixed plan, 0 draws | 19613 | 25165 | 38287 | 41180 | 53753 |
+| fixed plan, 16 draws | 7020 | 12568 | 31664 | 54883 | 58609 |
+| MPC, horizon 20, 0 draws | 3813 | 6312 | 17097 | 30654 | 44177 |
+| MPC, horizon 20, 16 draws | 4065 | 5537 | 20809 | 28318 | 34739 |
 
-## average distance over the episode, km above hindsight, paired mean over seeds
+## distance to the goal, summed over the moves, km above hindsight, paired mean over seeds
 
 | controller | σ=0.8 | σ=1.6 | σ=3.2 | σ=6.4 | σ=12.8 |
 |---|---|---|---|---|---|
-| fixed plan, 0 draws | 381 | 477 | 710 | 761 | 976 |
-| fixed plan, 16 draws | 214 | 322 | 379 | 820 | 808 |
-| MPC, horizon 20, 0 draws | 35 | 56 | 138 | 262 | 457 |
-| MPC, horizon 20, 16 draws | 37 | 59 | 136 | 281 | 432 |
+| fixed plan, 0 draws | 19041 | 23832 | 35506 | 38051 | 48803 |
+| fixed plan, 16 draws | 10721 | 16093 | 18932 | 41005 | 40379 |
+| MPC, horizon 20, 0 draws | 1730 | 2806 | 6890 | 13079 | 22868 |
+| MPC, horizon 20, 16 draws | 1874 | 2960 | 6803 | 14054 | 21585 |
 
 ## final distance, km above hindsight, paired mean over seeds
 
@@ -35,27 +35,27 @@ hindsight arrived (within task.arrival_km, ending the episode): 25/32; median mo
 | MPC, horizon 20, 0 draws | 329 | 265 | 314 | 477 | 802 |
 | MPC, horizon 20, 16 draws | 198 | 273 | 382 | 732 | 989 |
 
-## paired comparisons, average distance over the episode
+## paired comparisons, distance to the goal summed over the moves
 
 horizon: each horizon minus the next longer one, MPC on the mean
 
 draws: MPC with 16 draws minus MPC with 0, at each horizon
-  sigma   0.8  H20  N16 - N0:      +3 km [-12, +17]  a lower on 13/32  -> no detectable difference
-  sigma   1.6  H20  N16 - N0:      +3 km [-16, +22]  a lower on 12/32  -> no detectable difference
-  sigma   3.2  H20  N16 - N0:      -2 km [-34, +31]  a lower on 14/32  -> no detectable difference
-  sigma   6.4  H20  N16 - N0:     +20 km [-21, +60]  a lower on 12/32  -> no detectable difference
-  sigma  12.8  H20  N16 - N0:     -26 km [-132, +81]  a lower on 14/32  -> no detectable difference
+  sigma   0.8  H20  N16 - N0:    +144 km [-583, +870]  a lower on 13/32  -> no detectable difference
+  sigma   1.6  H20  N16 - N0:    +154 km [-794, +1103]  a lower on 12/32  -> no detectable difference
+  sigma   3.2  H20  N16 - N0:     -87 km [-1704, +1530]  a lower on 14/32  -> no detectable difference
+  sigma   6.4  H20  N16 - N0:    +975 km [-1034, +2984]  a lower on 12/32  -> no detectable difference
+  sigma  12.8  H20  N16 - N0:   -1282 km [-6615, +4050]  a lower on 14/32  -> no detectable difference
 
 draws: the fixed plan with 16 draws minus the fixed plan with 0
-  sigma   0.8  N16 - N0:    -166 km [-308, -25]  a lower on 23/32  -> lower
-  sigma   1.6  N16 - N0:    -155 km [-291, -19]  a lower on 21/32  -> lower
-  sigma   3.2  N16 - N0:    -331 km [-509, -154]  a lower on 20/32  -> lower
-  sigma   6.4  N16 - N0:     +59 km [-124, +242]  a lower on 16/32  -> no detectable difference
-  sigma  12.8  N16 - N0:    -168 km [-390, +54]  a lower on 18/32  -> no detectable difference
+  sigma   0.8  N16 - N0:   -8320 km [-15401, -1240]  a lower on 23/32  -> lower
+  sigma   1.6  N16 - N0:   -7739 km [-14543, -934]  a lower on 21/32  -> lower
+  sigma   3.2  N16 - N0:  -16573 km [-25459, -7688]  a lower on 20/32  -> lower
+  sigma   6.4  N16 - N0:   +2954 km [-6208, +12117]  a lower on 16/32  -> no detectable difference
+  sigma  12.8  N16 - N0:   -8424 km [-19522, +2675]  a lower on 18/32  -> no detectable difference
 
 replanning: MPC (horizon 20, 0 draws) minus the fixed plan (0 draws)
-  sigma   0.8:    -346 km [-514, -178]  a lower on 27/32  -> lower
-  sigma   1.6:    -421 km [-582, -259]  a lower on 30/32  -> lower
-  sigma   3.2:    -572 km [-772, -373]  a lower on 25/32  -> lower
-  sigma   6.4:    -499 km [-695, -304]  a lower on 28/32  -> lower
-  sigma  12.8:    -519 km [-691, -346]  a lower on 27/32  -> lower
+  sigma   0.8:  -17311 km [-25699, -8924]  a lower on 27/32  -> lower
+  sigma   1.6:  -21026 km [-29096, -12956]  a lower on 30/32  -> lower
+  sigma   3.2:  -28615 km [-38577, -18653]  a lower on 25/32  -> lower
+  sigma   6.4:  -24972 km [-34730, -15215]  a lower on 28/32  -> lower
+  sigma  12.8:  -25935 km [-34556, -17314]  a lower on 27/32  -> lower
