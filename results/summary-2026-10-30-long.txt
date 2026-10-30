@@ -1,0 +1,63 @@
+# arm: reach, goal 2000 km, 80 moves, belief scale 1, draws fresh
+608 rows, 32 seeds
+
+hindsight closest_km : median    136 km, quartiles 56 to 155
+hindsight final_km   : median    786 km, quartiles 342 to 1471
+hindsight summed_km  : median  64065 km, quartiles 46231 to 104244
+hindsight cost_km    : median  22900 km, quartiles 16939 to 34331
+hindsight within 200 km of the goal at some point: 29/32; median move of closest approach 35
+hindsight arrived (within task.arrival_km, ending the episode): 29/32; median move 23
+
+## the objective (distance summed until arrival), km above hindsight, paired mean over seeds
+
+| controller | σ=0 | σ=0.8 | σ=1.6 | σ=3.2 | σ=6.4 | σ=12.8 |
+|---|---|---|---|---|---|---|
+| fixed plan, 0 draws | 2583 | 58341 | 68192 | 104250 | 122073 | 135664 |
+| MPC, horizon 20, 0 draws | 8378 | 10848 | 16404 | 26121 | 66375 | 103447 |
+| MPC not learning, horizon 20, mean | 8378 | 11452 | 19248 | 38151 | 76730 | 102317 |
+
+## distance to the goal, summed over the moves, km above hindsight, paired mean over seeds
+
+| controller | σ=0 | σ=0.8 | σ=1.6 | σ=3.2 | σ=6.4 | σ=12.8 |
+|---|---|---|---|---|---|---|
+| fixed plan, 0 draws | 75409 | 87648 | 85722 | 114679 | 132481 | 125335 |
+| MPC, horizon 20, 0 draws | 7956 | 9594 | 12130 | 21227 | 30983 | 63362 |
+| MPC not learning, horizon 20, mean | 7956 | 9690 | 11830 | 21207 | 39402 | 62632 |
+
+## final distance, km above hindsight, paired mean over seeds
+
+| controller | σ=0 | σ=0.8 | σ=1.6 | σ=3.2 | σ=6.4 | σ=12.8 |
+|---|---|---|---|---|---|---|
+| fixed plan, 0 draws | 2496 | 3054 | 2596 | 3800 | 3797 | 3573 |
+| MPC, horizon 20, 0 draws | 428 | 421 | 507 | 686 | 790 | 1740 |
+| MPC not learning, horizon 20, mean | 428 | 474 | 513 | 555 | 946 | 1809 |
+
+## paired comparisons, distance to the goal summed over the moves
+
+horizon: each horizon minus the next longer one, MPC on the mean
+
+readings: MPC minus the same controller not learning from them, on the mean
+  below zero, what the balloon learned from its own anemometer was worth
+  sigma     0  H20:      +0 km [+0, +0]  a lower on 0/32  -> no detectable difference
+  sigma   0.8  H20:     -96 km [-2510, +2319]  a lower on 14/32  -> no detectable difference
+  sigma   1.6  H20:    +301 km [-2054, +2655]  a lower on 17/32  -> no detectable difference
+  sigma   3.2  H20:     +19 km [-3720, +3759]  a lower on 10/32  -> no detectable difference
+  sigma   6.4  H20:   -8419 km [-15046, -1793]  a lower on 20/32  -> lower
+  sigma  12.8  H20:    +730 km [-6172, +7631]  a lower on 19/32  -> no detectable difference
+
+replanning alone: MPC not learning, minus the fixed plan, both on the mean
+  below zero, what re-solving every move was worth without knowing any more than the forecast said
+  sigma     0  H20:  -67453 km [-94955, -39951]  a lower on 26/32  -> lower
+  sigma   0.8  H20:  -77959 km [-105109, -50808]  a lower on 30/32  -> lower
+  sigma   1.6  H20:  -73892 km [-98226, -49558]  a lower on 30/32  -> lower
+  sigma   3.2  H20:  -93471 km [-123853, -63090]  a lower on 30/32  -> lower
+  sigma   6.4  H20:  -93079 km [-123587, -62570]  a lower on 30/32  -> lower
+  sigma  12.8  H20:  -62702 km [-88560, -36845]  a lower on 30/32  -> lower
+
+replanning: MPC (horizon 20, 0 draws) minus the fixed plan (0 draws)
+  sigma     0:  -67453 km [-94955, -39951]  a lower on 26/32  -> lower
+  sigma   0.8:  -78054 km [-105379, -50729]  a lower on 30/32  -> lower
+  sigma   1.6:  -73591 km [-97711, -49472]  a lower on 30/32  -> lower
+  sigma   3.2:  -93452 km [-123618, -63286]  a lower on 30/32  -> lower
+  sigma   6.4: -101498 km [-130974, -72022]  a lower on 31/32  -> lower
+  sigma  12.8:  -61973 km [-86295, -37651]  a lower on 30/32  -> lower
