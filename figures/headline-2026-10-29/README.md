@@ -12,10 +12,15 @@ needed, and the table. Crosswind, upwind and random goals are unreachable at eve
 wind levels in this record oppose each other at only 58% of points, so an altitude-only balloon goes downwind
 or nowhere.
 
-1. **one_flight**: seed 3 at the real forecast error (3.2 m/s). Hindsight passes 13 km from the goal, MPC
-   162 km, the fixed plan sails on to 1,581 km. All three ride the same easterly out; the difference is
-   whether anything turns them south in time. One seed, an illustration.
-   (`flight_seed3_sigma3.2.png`)
+1. **one_flight**: seed 3 at the real forecast error (3.2 m/s). All three ride the same easterly out; the
+   difference is whether anything turns them toward the goal in time. Solid is the episode, faint is what was
+   flown after the balloon was already inside the 200 km ring, which costs nothing and should not be read as
+   part of the flight. One seed, an illustration. (`flight_seed3_sigma3.2.png`)
+
+   The version of this figure made on 2026-10-29 was wrong and is replaced: `map_flight.py` was not passing
+   the arrival radius, so its three flights were planned and scored on the plain sum, which is a different
+   objective from the one the sweep flew. The sweep's own rows were never affected, only this map. Numbers
+   quoted off the old one do not hold; `analyse_all.sh` redraws it.
 2. **all_controllers**: the objective against forecast error at MPC horizon 20. Hindsight flat and lowest,
    MPC solid below the fixed plan dashed. The line that matters is the dotted one, MPC that replans but never
    learns: it sits on top of solid MPC the whole way. Bars are each line's own standard error, unpaired, so
@@ -50,6 +55,7 @@ for a reading to tell the belief that the belief does not already say.
 - Figure 5's y-axis runs to -8 because of one seed at sigma 0, where the fixed plan and hindsight are nearly
   equal and the ratio blows up. Everything of interest is between 0 and 1. The axis wants clipping, or the
   sigma 0 column dropping, and its title is cut off at the right edge.
+- Figure 1 is one seed on one day. It is there to show what the three controllers do, not to support a claim.
 - Figures 3 and 4 show the horizons separating below 3 m/s, but at 0.8 and 1.6 m/s the paired intervals
   overlap almost completely. The ordering among horizons at low noise is not something 32 seeds can
   establish; only the gap between horizon 5 and the rest at sigma 0 is.
