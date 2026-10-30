@@ -45,14 +45,10 @@ for ARM in "${ARMS[@]}"; do
 done
 
 printf '\n\033[1m== flight maps\033[0m\n'
-# these re-fly a seed rather than reading the rows, so they need the record; without it, say so and carry on
-RECORD=$($PYTHON -c "from balloon_sim.config import WindConfig; print(WindConfig().path)")
-if [ -f "$RECORD" ]; then
-  for SEED in 0 3; do
-    $RUN scripts/map_flight.py --seed "$SEED" --sigma 3.2 --into "figures/$STAMP" | head -1
-  done
-else
-  echo "   no record at $RECORD; the maps need it, everything else above does not"
-fi
+# drawn from the rows' own saved trajectories, so these need no wind record and cannot disagree with the
+# sweep: they are the sweep's flights. scripts/map_flight.py re-flies a seed instead, for a cell nobody ran.
+for SEED in 9 3 0; do
+  $RUN scripts/map_rows.py "$ROWS" --seed "$SEED" --sigma 3.2 --into "figures/$STAMP" | head -1
+done
 
 printf '\n\033[1mdone\033[0m\n  summaries: results/summary-%s-*.txt\n  figures:   figures/%s*\n' "$STAMP" "$STAMP"

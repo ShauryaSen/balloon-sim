@@ -12,14 +12,20 @@ needed, and the table. Crosswind, upwind and random goals are unreachable at eve
 wind levels in this record oppose each other at only 58% of points, so an altitude-only balloon goes downwind
 or nowhere.
 
-1. **one_flight**: *not in this set yet, on purpose.* The version made on 2026-10-29 was wrong:
-   `map_flight.py` was not passing the arrival radius, so its three flights were planned and scored on the
-   plain sum over every move, which is a different objective from the one the sweep flew. It was a map of a
-   different controller on a different task, and the numbers quoted off it do not hold. The sweep's own rows
-   were never affected; `run_cell.py` passes the radius and the rows show it, of the 3,257 flights that
-   arrived 3,243 have cost_km cut below summed_km and the other 14 arrived on the last move. The map is
-   fixed and redrawn by `analyse_all.sh`, which needs the wind record, so it reappears after the next run
-   rather than being shipped wrong a second time. (`flight_seed3_sigma3.2.png`)
+1. **one_flight**: seed 9 at the real forecast error (3.2 m/s). All three are carried west on the same
+   flow; hindsight and MPC both turn down into the ring at 51 h and the fixed plan sails past to the north
+   and never arrives, at 1,142 km on average against their 335. Solid is the episode, faint is what was
+   flown after the balloon was already inside the 200 km ring, which costs nothing. One seed, an
+   illustration, not evidence. (`flight_seed9_sigma3.2.png`; seeds 3 and 0 are drawn too, 0 being a day
+   nothing reaches the goal, hindsight included)
+
+   This is drawn from the rows' own saved trajectories by `scripts/map_rows.py`, so it is the sweep's own
+   flight and cannot disagree with it. The version shipped on 2026-10-29 could and did: `map_flight.py`
+   re-flew the seed and was not passing the arrival radius, so its flights were planned and scored on the
+   plain sum over every move, a different objective from the one the sweep flew. The sweep's rows were never
+   affected; of the 3,257 flights that arrived, 3,243 have cost_km cut below summed_km and the other 14
+   arrived on the last move.
+
 2. **all_controllers**: the objective against forecast error at MPC horizon 20, four lines. Hindsight flat
    and lowest, MPC solid below the fixed plan dashed. The line that matters is the dotted one, MPC that
    replans but never learns. Bars are each line's own standard error, unpaired, so they overstate the
@@ -58,7 +64,8 @@ for a reading to tell the belief that the belief does not already say.
 
 ## Known problems with these, if they go on a slide as they are
 
-- Figure 1 is missing until the next run redraws it, for the reason above.
+- Figure 1 is one seed on one day, chosen because it separates the three controllers cleanly. It is an
+  illustration. Seed 0 is the honest counterweight if anyone asks about the spread.
 - Figures 3 and 4 show the horizons separating below 3 m/s, but at 0.8 and 1.6 m/s the paired intervals
   overlap almost completely. The ordering among horizons at low noise is not something 32 seeds can
   establish; only the gap between horizon 5 and the rest at sigma 0 is.
