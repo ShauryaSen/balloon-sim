@@ -69,6 +69,48 @@ exactly nothing on every seed, which is the harness checking its own wiring. The
 lengthscale is 544 km and a move is one reading every 3 hours along a single line, so there is very little
 for a reading to tell the belief that the belief does not already say.
 
+## The rest of the 23rd's list
+
+Figures 0 to 7 are the talk. These are the ones to have open behind it, one per item from the notes of the
+23rd, because each is the answer to a question somebody asked rather than something we went looking for.
+
+8. **the_old_objective**, for *"fix the objective?"*: the same cells and the same seeds as figure 2, scored
+   the old way, summing distance to the goal over every move with no arrival. Below about 1.6 m/s the two
+   figures order the controllers differently, because the old score kept charging a balloon that had already
+   arrived and then drifted, so it was partly measuring drift rather than navigation. Both are correct about
+   different things, and nothing from before the 23rd is comparable to anything after it.
+   (`plain_lines_summed_km_h20.png`)
+
+9. and 10. **distance_1000km** and **distance_3000km**, for *"vary the distance even, maybe we just run this
+   over multiple so we also have one where it is barely reachable"*: figure 7 again at the goal either side
+   of the one we fly. The same shape all three times, zero at a perfect forecast, a trough near 3 m/s, and
+   back up after it, so what replanning is worth is not an artefact of the distance we happened to pick.
+   One caveat to say out loud: the goal moved out to 3,000 km but the episode stayed 50 moves, so the far
+   task is also the more hurried one, and the two cannot be separated inside this arm. The length arm now
+   running is what separates them.
+   (`2026-10-24-1000km/replanning_cost_km_n0.png`, `2026-10-24-3000km/...`)
+
+11. to 13. **hedging_every_draw_count**, **belief_half_as_wide**, **belief_twice_as_wide**, for *"find some
+    storms and test it so we can figure out if this averaging over belief draws truly has a problem"*: all
+    eleven lines, which is the one place the cluttered figure is the right figure, since the question is
+    about the draw counts themselves. Planning against 16 possible winds instead of one best guess is worth
+    168 to 239 km to the fixed plan and nothing at all to MPC, at every noise level. The obvious objection
+    is that our belief is unrealistically well calibrated, sharing a kernel with the noise by construction,
+    so 12 and 13 are the same arm with the belief told the error is half and twice its real size. The
+    pattern does not move. The storms themselves have not been run; this is the cheaper test of the same
+    idea, and it came back negative.
+    (`lines_cost_km_h20.png` from `2026-10-24`, `-belief05`, `-belief2`)
+
+14. **nested_draws**, for *"draw the 16, then permute them... so that would slightly reduce variability
+    while helping us isolate the effect of the number of samples, versus the actual variability inherent to
+    the samples"*: N of 1, 4 and 16 taken as the first n of one shared pool, so the arms differ only in how
+    many winds the plan saw and not in which ones it drew. Same pattern again, so the effect in 11 is the
+    count and not the luck of the draw. (`2026-10-24-nested/lines_cost_km_h20.png`)
+
+Four items from that list are not here because they have not been run: real GEFS forecasts instead of GP
+draws, more days and seasons, actual storms, and a penalty for arriving too early. Two more, the escape
+objective and the longer episode, are in the sweep running now.
+
 ## Known problems with these, if they go on a slide as they are
 
 - Figure 1 is one seed on one day, chosen because it separates the three controllers cleanly. It is an
