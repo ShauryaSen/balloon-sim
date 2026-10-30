@@ -40,7 +40,14 @@ METRICS = {
 """What gets a figure. cost_km is the objective under the arrival rule and summed_km the plain sum, so on a
 sweep run with arrival_km = 0 the two are the same and their figures agree. closest_km is how near the
 balloon ever came, which is the honest reachability measure once the goal is far: a balloon still flying
-toward a distant goal at the last move can end nearer than one that reached a near goal and was blown past."""
+toward a distant goal at the last move can end nearer than one that reached a near goal and was blown past.
+
+cost_km and summed_km are sums over the moves, and were once divided by the episode's length and drawn as
+an average distance per move. That is a constant rescale, so no comparison changed, but under the arrival
+rule the episode does not last the whole budget: a flight that arrived on move 17 had its cost spread over
+50 moves it never flew, and calling that an average distance was wrong for exactly the flights that went
+well. They are drawn as what they are, the objective in km, and the axis is large because the objective
+is large."""
 
 SHORT = {
     "cost_km": "the objective",
@@ -51,7 +58,6 @@ SHORT = {
 """The axis label says what a metric is; a title only has to say which one it is, and the long form was
 running off the right edge of the score figures"""
 
-SUMMED = ("summed_km", "cost_km")  # shown as an average per move, since a sum over 50 moves is hard to read
 INK, COLOURS = "#12161b", ("#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00")
 STYLE = {"hindsight": "-", "mpc": "-", "mpc_blind": ":", "fixed_plan": "--"}
 MARKER = {"hindsight": "o", "mpc": "o", "mpc_blind": "^", "fixed_plan": "o"}
@@ -261,13 +267,12 @@ def draw_horizons(rows: list[dict], sigmas: list[float], horizons: list[int], me
         for sigma in sigmas:
             gaps = np.array([r[metric] - hind[r["seed"]] for r in rows if r["controller"] == "mpc" and r["planner.horizon"] == horizon
                              and r["n_winds"] == n_winds and r["belief.sigma"] == sigma and r["seed"] in hind], dtype=float)
-            scale = 1.0 / rows[0]["task.n_moves"] if metric in SUMMED else 1.0  # a sum shown as an average per move
-            means.append(gaps.mean() * scale if gaps.size else np.nan)
-            half.append(1.96 * gaps.std(ddof=1) / np.sqrt(gaps.size) * scale if gaps.size > 1 else np.nan)
+            means.append(gaps.mean() if gaps.size else np.nan)
+            half.append(1.96 * gaps.std(ddof=1) / np.sqrt(gaps.size) if gaps.size > 1 else np.nan)
         panel.errorbar(sigmas, means, yerr=half, label=f"horizon {horizon} ({horizon * rows[0]['balloon.step_hours']:g} h)",
                        color=shade, marker="o", markersize=4, capsize=3, linewidth=1.8)
     panel.axhline(0.0, color=INK, linewidth=0.9)  # hindsight
-    what = "average distance over the episode" if metric in SUMMED else METRICS[metric].split(" (")[0]
+    what = SHORT.get(metric, metric)
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
     panel.set_ylabel(f"MPC minus hindsight, {what} (km)")
     drawn = "the belief's mean" if n_winds == 0 else f"{n_winds} belief draws"
@@ -294,7 +299,6 @@ def draw_replanning(rows: list[dict], sigmas: list[float], horizons: list[int], 
     floor = {(r["seed"], r["belief.sigma"]): r[metric] for r in rows if r["controller"] == "fixed_plan" and r["n_winds"] == n_winds}
     if not floor:
         return
-    scale = 1.0 / rows[0]["task.n_moves"] if metric in SUMMED else 1.0
     figure, panel = plt.subplots(figsize=(7.0, 4.6), dpi=200)
     shades = plt.get_cmap("viridis")(np.linspace(0.15, 0.85, len(horizons)))
     for shade, horizon in zip(shades, horizons):
@@ -304,11 +308,11 @@ def draw_replanning(rows: list[dict], sigmas: list[float], horizons: list[int], 
                              if r["controller"] == "mpc" and r["planner.horizon"] == horizon
                              and r["n_winds"] == n_winds and r["belief.sigma"] == sigma
                              and (r["seed"], sigma) in floor], dtype=float)
-            means.append(gaps.mean() * scale if gaps.size else np.nan)
+            means.append(gaps.mean() if gaps.size else np.nan)
         panel.plot(sigmas, means, label=f"horizon {horizon} ({horizon * rows[0]['balloon.step_hours']:g} h)",
                    color=shade, marker="o", markersize=4, linewidth=1.8)
     panel.axhline(0.0, color=INK, linewidth=0.9)  # the fixed plan: above it, replanning cost more than it gave
-    what = "average distance" if metric in SUMMED else METRICS[metric].split(" (")[0]
+    what = SHORT.get(metric, metric)
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
     panel.set_ylabel(f"MPC $-$ fixed plan, {what} (km)")
     drawn = "the belief's mean" if n_winds == 0 else f"{n_winds} belief draws"
@@ -332,14 +336,13 @@ def draw_surface(rows: list[dict], sigmas: list[float], horizons: list[int], met
     hind = {r["seed"]: r[metric] for r in rows if r["controller"] == "hindsight"}
     if not hind:
         return
-    scale = 1.0 / rows[0]["task.n_moves"] if metric in SUMMED else 1.0
     height = np.full((len(horizons), len(sigmas)), np.nan)
     for i, horizon in enumerate(horizons):
         for j, sigma in enumerate(sigmas):
             gaps = [r[metric] - hind[r["seed"]] for r in rows if r["controller"] == "mpc" and r["planner.horizon"] == horizon
                     and r["n_winds"] == n_winds and r["belief.sigma"] == sigma and r["seed"] in hind]
             if gaps:
-                height[i, j] = float(np.mean(gaps)) * scale
+                height[i, j] = float(np.mean(gaps))
 
     figure = plt.figure(figsize=(8.0, 6.0), dpi=200)
     panel = figure.add_subplot(projection="3d")
@@ -350,7 +353,7 @@ def draw_surface(rows: list[dict], sigmas: list[float], horizons: list[int], met
     panel.set_yticks(range(len(horizons)), [f"{h} ({h * rows[0]['balloon.step_hours']:g} h)" for h in horizons])
     panel.set_xlabel("forecast error $\\sigma$ (m/s)", labelpad=8)
     panel.set_ylabel("MPC horizon", labelpad=14)
-    what = "average distance" if metric in SUMMED else METRICS[metric].split(" (")[0]
+    what = SHORT.get(metric, metric)
     panel.set_zlabel(f"MPC $-$ hindsight, {what} (km)", labelpad=10)
     drawn = "the belief's mean" if n_winds == 0 else f"{n_winds} belief draws"
     panel.set_title(f"MPC above hindsight over error and horizon (MPC on {drawn})", fontsize=11, color=INK, y=0.97)

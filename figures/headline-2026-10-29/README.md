@@ -12,6 +12,13 @@ needed, and the table. Crosswind, upwind and random goals are unreachable at eve
 wind levels in this record oppose each other at only 58% of points, so an altitude-only balloon goes downwind
 or nowhere.
 
+0. **is_it_even_possible**: the twenty candidate tasks, and why the sweep flies the one it does. Top: how
+   often hindsight, which knows the true wind, reaches the goal at all; below 24 of 32 nothing can fly the
+   task, because the best possible controller cannot. Bottom: how far above hindsight a blind fixed plan
+   scores on a typical day; below 25% the wind is doing the work and no controller can show anything.
+   Downwind is the only direction above the first line at any distance, and it only clears the second one
+   once the goal is 2,000 km away. One of twenty qualifies. Lead with this: it says what an altitude-only
+   balloon can be asked to do before any controller is compared. (`scouting.png`)
 1. **one_flight**: seed 9 at the real forecast error (3.2 m/s). All three are carried west on the same
    flow; hindsight and MPC both turn down into the ring at 51 h and the fixed plan sails past to the north
    and never arrives, at 1,142 km on average against their 335. Solid is the episode, faint is what was

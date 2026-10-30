@@ -37,8 +37,15 @@ def keyed(rows: list[dict]) -> dict:
 
 
 def per_move(row: dict, metric: str) -> float:
-    """Summed distance as an average per move, so it reads as km; other metrics as they are"""
-    return row[metric] / row["task.n_moves"] if metric in ("summed_km", "cost_km") else row[metric]
+    """A metric as it is. Kept as a function because every reader goes through it.
+
+    cost_km and summed_km were once divided by the episode's length here, to read as a plain distance. That
+    is a constant rescale, so no comparison changed, but under the arrival rule the episode ends on arrival:
+    a flight that arrived on move 17 had its cost spread over 50 moves it never flew, so the number was not
+    an average distance for the flights that went well. The figures dropped the division too, and a summary
+    whose units differ from the figures beside it is worse than either choice on its own.
+    """
+    return row[metric]
 
 
 def compare(a: dict, b: dict, metric: str) -> str:
