@@ -64,6 +64,20 @@ def flags(cell, pool: int, keep_path: bool) -> str:
     return out
 
 
+def cost_guess(cell, pool: int) -> float:
+    """Roughly what a cell will cost, in arbitrary units, so the cheap ones can go first.
+
+    A solve costs about its horizon; a controller that replans does one every move, and one that commits
+    does a single solve over the whole episode. Averaging over draws multiplies the wind the solve rolls out
+    through. Measured against the 2026-10-24 sweep this ranks the cells about right, which is all it is for:
+    the array runs in index order, so cheap first means the short cells are done and out of the way while the
+    long ones are still going, rather than the queue being held by a block of slow cells at the front.
+    """
+    replans = cell.controller in ("mpc", "mpc_blind", "hindsight")
+    solves = cell.n_moves if replans else 1
+    return solves * cell.horizon * (1 + drawn(cell, pool))
+
+
 def drawn(cell, pool: int) -> int:
     """How many winds the cell actually draws, which is what its memory scales with. A nested cell draws the
     whole pool however few of them its plan ends up averaging over"""
@@ -83,6 +97,8 @@ def main(argv: list[str] | None = None) -> None:
     ask.add_argument("--big-draws", type=int, default=16, help="a cell drawing at least this many winds is big")
     ask.add_argument("--arms", default=",".join(SWEEP), help=f"which arms to run, comma separated: {', '.join(ARMS)}")
     ask.add_argument("--keep-path", action="store_true", help="record every cell's trajectory in its row")
+    ask.add_argument("--order", choices=("cheap", "listed"), default="cheap",
+                     help="cheap: the quick cells first, so they are done while the slow ones run. listed: arm by arm")
     ask.add_argument("--dry-run", action="store_true", help="print the cells and do not submit")
     ask.add_argument("overrides", nargs="*", help="after --: run_cell.py flags added to every cell")
     asked = ask.parse_args(argv)
@@ -96,12 +112,16 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(f"no such arm: {', '.join(unknown)}. Known arms: {', '.join(ARMS)}")
     grid = cells(experiment, TaskConfig().n_moves, BeliefConfig().sigma, arms)
     pool = experiment.nested_pool
+    if asked.order == "cheap":
+        grid.sort(key=lambda cell: cost_guess(cell, pool))
     lines = [f"{flags(cell, pool, asked.keep_path)} {extra}".strip() for cell in grid]
 
     counted: dict[str, int] = {}
     for cell in grid:
         counted[cell.controller] = counted.get(cell.controller, 0) + 1
     print(f"{len(grid)} cells over arms {', '.join(arms)}: " + ", ".join(f"{n} {name}" for name, n in sorted(counted.items())))
+    if asked.order == "cheap":
+        print(f"  cheapest first: {cost_guess(grid[0], pool):.0f} to {cost_guess(grid[-1], pool):.0f} on the guess above")
     for name in arms:  # what each arm costs on its own, before the overlap between them is removed
         print(f"  {name:12s} {len(cells(experiment, TaskConfig().n_moves, BeliefConfig().sigma, (name,))):5d} cells")
     if asked.dry_run:
