@@ -42,9 +42,21 @@ sweep run with arrival_km = 0 the two are the same and their figures agree. clos
 balloon ever came, which is the honest reachability measure once the goal is far: a balloon still flying
 toward a distant goal at the last move can end nearer than one that reached a near goal and was blown past."""
 
+SHORT = {
+    "cost_km": "the objective",
+    "summed_km": "summed distance to the goal",
+    "final_km": "distance at the end",
+    "closest_km": "closest approach",
+}
+"""The axis label says what a metric is; a title only has to say which one it is, and the long form was
+running off the right edge of the score figures"""
+
 SUMMED = ("summed_km", "cost_km")  # shown as an average per move, since a sum over 50 moves is hard to read
 INK, COLOURS = "#12161b", ("#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00")
 STYLE = {"hindsight": "-", "mpc": "-", "mpc_blind": ":", "fixed_plan": "--"}
+MARKER = {"hindsight": "o", "mpc": "o", "mpc_blind": "^", "fixed_plan": "o"}
+"""A line's style tells the controllers apart where they share a colour, and there are no lines on the dots
+figure to carry it, so the shape does the same job there: MPC a circle, MPC that does not learn a triangle"""
 """A line per controller: solid replans and learns, dotted replans without learning, dashed commits once.
 Anything a later sweep adds falls back to solid rather than stopping the figure"""
 """A line's colour says how many winds it planned on, its style which controller it is: hindsight black,
@@ -68,16 +80,30 @@ def label(controller: str, n_winds: int) -> str:
     return f"{NAMES.get(controller, controller)}, {drawn}"
 
 
+def plainly(lines: dict) -> dict:
+    """Just the controllers planning on the belief's mean.
+
+    The full figure draws every draw count, which is eleven lines and unreadable anywhere but on paper. The
+    comparison the results actually rest on is four: the ceiling, the floor, MPC, and MPC not learning. The
+    cluttered version is still written beside this one, since it is the record of what was run.
+    """
+    return {which: line for which, line in lines.items() if which[1] == 0}
+
+
 def series(rows: list[dict], horizon: int) -> dict[tuple[str, int], dict[float, dict[int, float]]]:
     """The rows this horizon's figures use, as {(controller, n_winds): {sigma: {seed: metric}}}
 
     Hindsight and the fixed plan commit to the whole episode, so the MPC horizon does not reach them and
     their rows are shared by every horizon's figures. Hindsight never reads the forecast either, so its one
     run per seed is repeated across the ladder rather than run again at each sigma.
+
+    Every controller that replans is held to the horizon, mpc_blind included. Keeping only "mpc" to it left
+    mpc_blind's four horizons averaged into one line, so the figure's not-learning line was a blend that a
+    short horizon dragged upward, and it read as a gap that the paired comparison does not support.
     """
     out: dict = {}
     for r in rows:
-        if r["controller"] == "mpc" and r["planner.horizon"] != horizon:
+        if r["controller"].startswith("mpc") and r["planner.horizon"] != horizon:
             continue
         out.setdefault((r["controller"], r["n_winds"]), {}).setdefault(r["belief.sigma"], {})[r["seed"]] = r
     return out
@@ -127,7 +153,9 @@ def draw_dots(lines: dict, sigmas: list[float], metric: str, into: Path, title: 
     same every time it is made.
     """
     which = sorted(lines)
-    figure, panel = plt.subplots(figsize=(1.9 * len(sigmas) + 4.0, 4.6), dpi=200)
+    # wide enough for the columns it actually has: eleven series per sigma need the room, four do not
+    wide = 4.0 + 0.9 * len(sigmas) * (0.3 + 0.12 * max(len(which), 1))
+    figure, panel = plt.subplots(figsize=(wide, 4.6), dpi=200)
     width = 0.8 / max(len(which), 1)
     shake = np.random.default_rng(0)
     for slot, key in enumerate(which):
@@ -140,9 +168,10 @@ def draw_dots(lines: dict, sigmas: list[float], metric: str, into: Path, title: 
             values = [r[metric] for r in by_seed.values()]
             jitter = shake.uniform(-width * 0.35, width * 0.35, len(values))
             hollow = key[0] == "fixed_plan"  # the fixed plan's dots are open, as its lines are dashed elsewhere
-            panel.scatter(i + offset + jitter, values, s=7.0, linewidths=0.8, zorder=3,
+            panel.scatter(i + offset + jitter, values, s=7.0, linewidths=0.8, zorder=3, marker=MARKER.get(key[0], "o"),
                           facecolors="none" if hollow else colour(*key), edgecolors=colour(*key), alpha=0.8)
-        panel.scatter([], [], s=14.0, linewidths=0.8, facecolors="none" if key[0] == "fixed_plan" else colour(*key),
+        panel.scatter([], [], s=14.0, linewidths=0.8, marker=MARKER.get(key[0], "o"),
+                      facecolors="none" if key[0] == "fixed_plan" else colour(*key),
                       edgecolors=colour(*key), label=label(*key))
     panel.set_xticks(range(len(sigmas)), [f"{s:g}" for s in sigmas])
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
@@ -170,6 +199,8 @@ def draw_score(lines: dict, sigmas: list[float], metric: str, into: Path, title:
         return
     hind_by_seed = next(iter(hind.values()))
     figure, panel = plt.subplots(figsize=(7.0, 4.6), dpi=200)
+    drawn_medians: list[float] = []  # what the axis is scaled to
+    drawn_whiskers: list[float] = []  # and what may run past it
     for slot, (which, line) in enumerate(sorted(lines.items())):
         if which[0] != "mpc":
             continue
@@ -188,10 +219,23 @@ def draw_score(lines: dict, sigmas: list[float], metric: str, into: Path, title:
             values = np.array(scores, dtype=float)
             q = np.percentile(values, [25, 50, 75]) if values.size >= 4 else np.array([np.nan] * 3)
             medians.append(q[1]); low.append(q[1] - q[0]); high.append(q[2] - q[1])
+            drawn_medians.append(q[1]); drawn_whiskers.extend((q[0], q[2]))
         panel.errorbar(sigmas, medians, yerr=[low, high], label=label(*which), color=colour(*which), linestyle=STYLE.get(which[0], "-"),
                        marker="o", markersize=4, capsize=3, linewidth=1.5)
     panel.axhline(1.0, color="#999999", linewidth=0.9, linestyle=":", zorder=0)  # as good as knowing the wind
     panel.axhline(0.0, color="#999999", linewidth=0.9, zorder=0)  # no better than a blind plan
+    # A score is a ratio and near sigma = 0 the gap it divides by is nearly zero, so one seed's quartile
+    # reaches -8 and squashes every line onto one another. The axis is held to where the medians live,
+    # padded, and never tighter than the 0 and 1 lines, which are the two heights that mean anything. A
+    # whisker running past the edge is said in the corner rather than left to flatten the figure.
+    shown = np.array([m for m in drawn_medians if np.isfinite(m)], dtype=float)
+    if shown.size:
+        pad = 0.15 * max(float(shown.max() - shown.min()), 0.5)
+        bottom, top = min(float(shown.min()) - pad, -0.1), max(float(shown.max()) + pad, 1.1)
+        panel.set_ylim(bottom, top)
+        if any(np.isfinite(w) and (w < bottom or w > top) for w in drawn_whiskers):
+            panel.text(0.99, 0.02, "a quartile runs past the axis", transform=panel.transAxes,
+                       ha="right", va="bottom", fontsize=7, color="#999999")
     panel.set_xlabel("forecast error $\\sigma$ (m/s)")
     panel.set_ylabel("(fixed plan $-$ MPC) / (fixed plan $-$ hindsight)")
     panel.set_title(title, fontsize=11, loc="left", color=INK)
@@ -355,10 +399,13 @@ def main(argv: list[str] | None = None) -> None:
         lines = series(rows, horizon)
         for metric in drawn_metrics:
             stem = f"{metric}_h{horizon}"
-            named = f"{METRICS[metric].split(' (')[0]}, MPC horizon {horizon}"
-            draw_lines(lines, sigmas, metric, into / f"lines_{stem}.png", named)
-            draw_dots(lines, sigmas, metric, into / f"dots_{stem}.png", named)
-            draw_score(lines, sigmas, metric, into / f"score_{stem}.png", f"MPC between the bounds: {named}")
+            named = f"{SHORT.get(metric, metric)}, MPC horizon {horizon}"
+            # every draw count, which is the record, and then the four lines the results rest on, which is
+            # what goes on a slide: the ceiling, the floor, MPC, and MPC not learning
+            for prefix, chosen in (("", lines), ("plain_", plainly(lines))):
+                draw_lines(chosen, sigmas, metric, into / f"{prefix}lines_{stem}.png", named)
+                draw_dots(chosen, sigmas, metric, into / f"{prefix}dots_{stem}.png", named)
+                draw_score(chosen, sigmas, metric, into / f"{prefix}score_{stem}.png", f"MPC between the bounds: {named}")
     for metric in drawn_metrics:
         for n in sorted({r["n_winds"] for r in rows if r["controller"] == "mpc"}):
             draw_horizons(rows, sigmas, horizons, metric, n, into / f"horizons_{metric}_n{n}.png")

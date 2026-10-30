@@ -1,0 +1,217 @@
+# arm: reach, goal 2000 km, 50 moves, belief scale 1, draws fresh
+4832 rows, 32 seeds
+
+hindsight closest_km : median    140 km, quartiles 63 to 190
+hindsight final_km   : median    548 km, quartiles 288 to 1571
+hindsight summed_km  : median    802 km, quartiles 586 to 980
+hindsight cost_km    : median    441 km, quartiles 339 to 676
+hindsight within 200 km of the goal at some point: 25/32; median move of closest approach 30
+hindsight arrived (within task.arrival_km, ending the episode): 25/32; median move 20
+
+## the objective (distance summed until arrival), km above hindsight, paired mean over seeds
+
+| controller | σ=0 | σ=0.8 | σ=1.6 | σ=3.2 | σ=6.4 | σ=12.8 |
+|---|---|---|---|---|---|---|
+| fixed plan, 0 draws | 19 | 400 | 511 | 774 | 831 | 1083 |
+| fixed plan, 1 draws | 19 | 477 | 922 | 730 | 1124 | 1446 |
+| fixed plan, 4 draws | 18 | 166 | 432 | 731 | 1014 | 849 |
+| fixed plan, 16 draws | 20 | 112 | 412 | 424 | 867 | 1348 |
+| fixed plan, 64 draws | 23 | 125 | 209 | 466 | 881 | 1116 |
+| MPC, horizon 5, 0 draws | 179 | 302 | 315 | 359 | 675 | 909 |
+| MPC, horizon 5, 1 draws | 179 | 278 | 337 | 566 | 685 | 880 |
+| MPC, horizon 5, 4 draws | 179 | 315 | 349 | 507 | 706 | 864 |
+| MPC, horizon 5, 16 draws | 177 | 303 | 323 | 486 | 738 | 944 |
+| MPC, horizon 10, 0 draws | 125 | 132 | 151 | 357 | 664 | 861 |
+| MPC, horizon 10, 1 draws | 125 | 134 | 161 | 249 | 399 | 664 |
+| MPC, horizon 10, 4 draws | 122 | 117 | 266 | 376 | 654 | 852 |
+| MPC, horizon 10, 16 draws | 127 | 120 | 155 | 225 | 655 | 854 |
+| MPC, horizon 20, 0 draws | 61 | 90 | 110 | 216 | 629 | 914 |
+| MPC, horizon 20, 1 draws | 61 | 72 | 101 | 275 | 520 | 730 |
+| MPC, horizon 20, 4 draws | 57 | 90 | 99 | 223 | 557 | 762 |
+| MPC, horizon 20, 16 draws | 65 | 81 | 120 | 245 | 544 | 727 |
+| MPC, horizon 50, 0 draws | 8 | 45 | 98 | 338 | 603 | 863 |
+| MPC, horizon 50, 1 draws | 8 | 52 | 146 | 358 | 570 | 760 |
+| MPC, horizon 50, 4 draws | 6 | 35 | 115 | 198 | 566 | 658 |
+| MPC, horizon 50, 16 draws | 7 | 27 | 89 | 216 | 368 | 674 |
+| MPC not learning, horizon 5, mean | 179 | 308 | 332 | 493 | 711 | 917 |
+| MPC not learning, horizon 10, mean | 125 | 140 | 157 | 367 | 705 | 844 |
+| MPC not learning, horizon 20, mean | 61 | 94 | 180 | 381 | 673 | 949 |
+| MPC not learning, horizon 50, mean | 8 | 52 | 107 | 359 | 611 | 867 |
+
+## average distance over the episode, km above hindsight, paired mean over seeds
+
+| controller | σ=0 | σ=0.8 | σ=1.6 | σ=3.2 | σ=6.4 | σ=12.8 |
+|---|---|---|---|---|---|---|
+| fixed plan, 0 draws | 377 | 406 | 502 | 736 | 787 | 1002 |
+| fixed plan, 1 draws | 377 | 439 | 631 | 738 | 752 | 1087 |
+| fixed plan, 4 draws | 393 | 372 | 474 | 645 | 633 | 909 |
+| fixed plan, 16 draws | 377 | 253 | 310 | 446 | 736 | 969 |
+| fixed plan, 64 draws | 380 | 238 | 328 | 497 | 747 | 956 |
+| MPC, horizon 5, 0 draws | 149 | 151 | 151 | 212 | 284 | 494 |
+| MPC, horizon 5, 1 draws | 149 | 144 | 179 | 272 | 398 | 488 |
+| MPC, horizon 5, 4 draws | 143 | 164 | 178 | 225 | 297 | 468 |
+| MPC, horizon 5, 16 draws | 149 | 153 | 155 | 226 | 332 | 540 |
+| MPC, horizon 10, 0 draws | 98 | 103 | 126 | 160 | 284 | 459 |
+| MPC, horizon 10, 1 draws | 98 | 104 | 136 | 225 | 332 | 539 |
+| MPC, horizon 10, 4 draws | 93 | 92 | 125 | 187 | 273 | 466 |
+| MPC, horizon 10, 16 draws | 96 | 92 | 127 | 172 | 275 | 469 |
+| MPC, horizon 20, 0 draws | 50 | 58 | 83 | 166 | 297 | 524 |
+| MPC, horizon 20, 1 draws | 50 | 60 | 85 | 195 | 289 | 510 |
+| MPC, horizon 20, 4 draws | 42 | 57 | 85 | 171 | 302 | 461 |
+| MPC, horizon 20, 16 draws | 55 | 55 | 75 | 158 | 305 | 461 |
+| MPC, horizon 50, 0 draws | 26 | 61 | 75 | 132 | 301 | 466 |
+| MPC, horizon 50, 1 draws | 26 | 57 | 99 | 213 | 329 | 528 |
+| MPC, horizon 50, 4 draws | 26 | 41 | 81 | 169 | 290 | 404 |
+| MPC, horizon 50, 16 draws | 22 | 40 | 49 | 147 | 312 | 423 |
+| MPC not learning, horizon 5, mean | 149 | 156 | 159 | 235 | 332 | 514 |
+| MPC not learning, horizon 10, mean | 98 | 112 | 127 | 193 | 331 | 473 |
+| MPC not learning, horizon 20, mean | 50 | 63 | 77 | 165 | 317 | 569 |
+| MPC not learning, horizon 50, mean | 26 | 35 | 76 | 143 | 292 | 467 |
+
+## final distance, km above hindsight, paired mean over seeds
+
+| controller | σ=0 | σ=0.8 | σ=1.6 | σ=3.2 | σ=6.4 | σ=12.8 |
+|---|---|---|---|---|---|---|
+| fixed plan, 0 draws | 1291 | 1268 | 1490 | 2019 | 1829 | 2458 |
+| fixed plan, 1 draws | 1291 | 1391 | 1791 | 2093 | 1825 | 2515 |
+| fixed plan, 4 draws | 1416 | 1112 | 1373 | 1825 | 1696 | 2049 |
+| fixed plan, 16 draws | 1293 | 784 | 989 | 1036 | 1678 | 2366 |
+| fixed plan, 64 draws | 1319 | 640 | 1067 | 1199 | 1766 | 2252 |
+| MPC, horizon 5, 0 draws | 571 | 575 | 540 | 655 | 746 | 894 |
+| MPC, horizon 5, 1 draws | 571 | 533 | 606 | 757 | 987 | 1187 |
+| MPC, horizon 5, 4 draws | 561 | 645 | 642 | 674 | 721 | 875 |
+| MPC, horizon 5, 16 draws | 579 | 561 | 560 | 682 | 857 | 1103 |
+| MPC, horizon 10, 0 draws | 429 | 434 | 471 | 456 | 713 | 839 |
+| MPC, horizon 10, 1 draws | 429 | 426 | 482 | 539 | 754 | 1025 |
+| MPC, horizon 10, 4 draws | 409 | 409 | 499 | 576 | 713 | 996 |
+| MPC, horizon 10, 16 draws | 380 | 417 | 464 | 559 | 750 | 955 |
+| MPC, horizon 20, 0 draws | 307 | 308 | 351 | 400 | 593 | 962 |
+| MPC, horizon 20, 1 draws | 307 | 246 | 259 | 499 | 605 | 1039 |
+| MPC, horizon 20, 4 draws | 235 | 351 | 341 | 466 | 697 | 932 |
+| MPC, horizon 20, 16 draws | 308 | 336 | 331 | 332 | 649 | 801 |
+| MPC, horizon 50, 0 draws | 60 | 188 | 219 | 313 | 466 | 792 |
+| MPC, horizon 50, 1 draws | 60 | 277 | 158 | 340 | 567 | 1101 |
+| MPC, horizon 50, 4 draws | 74 | 197 | 192 | 464 | 571 | 679 |
+| MPC, horizon 50, 16 draws | 58 | 267 | 125 | 302 | 594 | 783 |
+| MPC not learning, horizon 5, mean | 571 | 556 | 552 | 699 | 839 | 1121 |
+| MPC not learning, horizon 10, mean | 429 | 471 | 457 | 576 | 848 | 971 |
+| MPC not learning, horizon 20, mean | 307 | 307 | 329 | 439 | 692 | 991 |
+| MPC not learning, horizon 50, mean | 60 | 78 | 215 | 288 | 542 | 826 |
+
+## paired comparisons, average distance over the episode
+
+horizon: each horizon minus the next longer one, MPC on the mean
+  sigma     0  H5  - H10:     +51 km [+8, +94]  a lower on 6/32  -> higher
+  sigma     0  H10 - H20:     +48 km [+23, +74]  a lower on 7/32  -> higher
+  sigma     0  H20 - H50:     +24 km [-3, +51]  a lower on 11/32  -> no detectable difference
+  sigma   0.8  H5  - H10:     +48 km [-0, +96]  a lower on 7/32  -> no detectable difference
+  sigma   0.8  H10 - H20:     +45 km [+24, +67]  a lower on 7/32  -> higher
+  sigma   0.8  H20 - H50:      -3 km [-32, +25]  a lower on 15/32  -> no detectable difference
+  sigma   1.6  H5  - H10:     +25 km [+5, +46]  a lower on 11/32  -> higher
+  sigma   1.6  H10 - H20:     +43 km [+13, +73]  a lower on 12/32  -> higher
+  sigma   1.6  H20 - H50:      +8 km [-17, +33]  a lower on 16/32  -> no detectable difference
+  sigma   3.2  H5  - H10:     +52 km [-25, +129]  a lower on 11/32  -> no detectable difference
+  sigma   3.2  H10 - H20:      -6 km [-40, +28]  a lower on 18/32  -> no detectable difference
+  sigma   3.2  H20 - H50:     +35 km [-6, +76]  a lower on 12/32  -> no detectable difference
+  sigma   6.4  H5  - H10:      -0 km [-40, +39]  a lower on 13/32  -> no detectable difference
+  sigma   6.4  H10 - H20:     -13 km [-60, +34]  a lower on 17/32  -> no detectable difference
+  sigma   6.4  H20 - H50:      -3 km [-62, +55]  a lower on 15/32  -> no detectable difference
+  sigma  12.8  H5  - H10:     +35 km [-63, +134]  a lower on 11/32  -> no detectable difference
+  sigma  12.8  H10 - H20:     -66 km [-194, +63]  a lower on 17/32  -> no detectable difference
+  sigma  12.8  H20 - H50:     +58 km [-35, +152]  a lower on 17/32  -> no detectable difference
+
+draws: MPC with 16 draws minus MPC with 0, at each horizon
+  sigma     0  H5   N16 - N0:      -0 km [-4, +4]  a lower on 12/32  -> no detectable difference
+  sigma     0  H10  N16 - N0:      -1 km [-10, +7]  a lower on 16/32  -> no detectable difference
+  sigma     0  H20  N16 - N0:      +6 km [-0, +11]  a lower on 12/32  -> no detectable difference
+  sigma     0  H50  N16 - N0:      -3 km [-10, +4]  a lower on 17/32  -> no detectable difference
+  sigma   0.8  H5   N16 - N0:      +2 km [-6, +10]  a lower on 18/32  -> no detectable difference
+  sigma   0.8  H10  N16 - N0:     -11 km [-30, +7]  a lower on 23/32  -> no detectable difference
+  sigma   0.8  H20  N16 - N0:      -2 km [-11, +6]  a lower on 16/32  -> no detectable difference
+  sigma   0.8  H50  N16 - N0:     -21 km [-44, +1]  a lower on 17/32  -> no detectable difference
+  sigma   1.6  H5   N16 - N0:      +3 km [-7, +13]  a lower on 13/32  -> no detectable difference
+  sigma   1.6  H10  N16 - N0:      +1 km [-8, +10]  a lower on 14/32  -> no detectable difference
+  sigma   1.6  H20  N16 - N0:      -9 km [-26, +9]  a lower on 17/32  -> no detectable difference
+  sigma   1.6  H50  N16 - N0:     -26 km [-48, -4]  a lower on 18/32  -> lower
+  sigma   3.2  H5   N16 - N0:     +13 km [-7, +33]  a lower on 16/32  -> no detectable difference
+  sigma   3.2  H10  N16 - N0:     +11 km [-39, +62]  a lower on 18/32  -> no detectable difference
+  sigma   3.2  H20  N16 - N0:      -8 km [-39, +23]  a lower on 21/32  -> no detectable difference
+  sigma   3.2  H50  N16 - N0:     +15 km [-26, +56]  a lower on 12/32  -> no detectable difference
+  sigma   6.4  H5   N16 - N0:     +48 km [-27, +123]  a lower on 13/32  -> no detectable difference
+  sigma   6.4  H10  N16 - N0:      -9 km [-56, +39]  a lower on 14/32  -> no detectable difference
+  sigma   6.4  H20  N16 - N0:      +7 km [-43, +57]  a lower on 15/32  -> no detectable difference
+  sigma   6.4  H50  N16 - N0:     +11 km [-54, +77]  a lower on 16/32  -> no detectable difference
+  sigma  12.8  H5   N16 - N0:     +47 km [-81, +174]  a lower on 19/32  -> no detectable difference
+  sigma  12.8  H10  N16 - N0:     +11 km [-60, +82]  a lower on 18/32  -> no detectable difference
+  sigma  12.8  H20  N16 - N0:     -63 km [-153, +27]  a lower on 17/32  -> no detectable difference
+  sigma  12.8  H50  N16 - N0:     -43 km [-114, +29]  a lower on 20/32  -> no detectable difference
+
+readings: MPC minus the same controller not learning from them, on the mean
+  below zero, what the balloon learned from its own anemometer was worth
+  sigma     0  H5 :      +0 km [+0, +0]  a lower on 0/32  -> no detectable difference
+  sigma     0  H10:      +0 km [+0, +0]  a lower on 0/32  -> no detectable difference
+  sigma     0  H20:      +0 km [+0, +0]  a lower on 0/32  -> no detectable difference
+  sigma     0  H50:      +0 km [+0, +0]  a lower on 0/32  -> no detectable difference
+  sigma   0.8  H5 :      -5 km [-15, +6]  a lower on 20/32  -> no detectable difference
+  sigma   0.8  H10:      -9 km [-23, +5]  a lower on 14/32  -> no detectable difference
+  sigma   0.8  H20:      -5 km [-16, +6]  a lower on 20/32  -> no detectable difference
+  sigma   0.8  H50:     +26 km [+1, +51]  a lower on 16/32  -> higher
+  sigma   1.6  H5 :      -8 km [-40, +24]  a lower on 22/32  -> no detectable difference
+  sigma   1.6  H10:      -1 km [-12, +10]  a lower on 18/32  -> no detectable difference
+  sigma   1.6  H20:      +6 km [-13, +24]  a lower on 17/32  -> no detectable difference
+  sigma   1.6  H50:      -1 km [-24, +22]  a lower on 18/32  -> no detectable difference
+  sigma   3.2  H5 :     -22 km [-60, +15]  a lower on 22/32  -> no detectable difference
+  sigma   3.2  H10:     -33 km [-90, +25]  a lower on 20/32  -> no detectable difference
+  sigma   3.2  H20:      +1 km [-33, +35]  a lower on 10/32  -> no detectable difference
+  sigma   3.2  H50:     -11 km [-32, +10]  a lower on 15/32  -> no detectable difference
+  sigma   6.4  H5 :     -49 km [-117, +20]  a lower on 22/32  -> no detectable difference
+  sigma   6.4  H10:     -48 km [-102, +7]  a lower on 20/32  -> no detectable difference
+  sigma   6.4  H20:     -20 km [-61, +22]  a lower on 17/32  -> no detectable difference
+  sigma   6.4  H50:      +8 km [-26, +43]  a lower on 16/32  -> no detectable difference
+  sigma  12.8  H5 :     -21 km [-149, +107]  a lower on 17/32  -> no detectable difference
+  sigma  12.8  H10:     -14 km [-100, +71]  a lower on 17/32  -> no detectable difference
+  sigma  12.8  H20:     -45 km [-128, +38]  a lower on 19/32  -> no detectable difference
+  sigma  12.8  H50:      -1 km [-45, +43]  a lower on 19/32  -> no detectable difference
+
+replanning alone: MPC not learning, minus the fixed plan, both on the mean
+  below zero, what re-solving every move was worth without knowing any more than the forecast said
+  sigma     0  H5 :    -228 km [-383, -73]  a lower on 21/32  -> lower
+  sigma     0  H10:    -279 km [-442, -116]  a lower on 22/32  -> lower
+  sigma     0  H20:    -327 km [-485, -169]  a lower on 24/32  -> lower
+  sigma     0  H50:    -351 km [-508, -195]  a lower on 30/32  -> lower
+  sigma   0.8  H5 :    -251 km [-419, -82]  a lower on 22/32  -> lower
+  sigma   0.8  H10:    -294 km [-466, -123]  a lower on 23/32  -> lower
+  sigma   0.8  H20:    -344 km [-515, -172]  a lower on 27/32  -> lower
+  sigma   0.8  H50:    -371 km [-536, -206]  a lower on 30/32  -> lower
+  sigma   1.6  H5 :    -343 km [-512, -174]  a lower on 29/32  -> lower
+  sigma   1.6  H10:    -375 km [-537, -213]  a lower on 30/32  -> lower
+  sigma   1.6  H20:    -425 km [-588, -262]  a lower on 30/32  -> lower
+  sigma   1.6  H50:    -426 km [-591, -261]  a lower on 30/32  -> lower
+  sigma   3.2  H5 :    -501 km [-702, -299]  a lower on 28/32  -> lower
+  sigma   3.2  H10:    -542 km [-743, -342]  a lower on 26/32  -> lower
+  sigma   3.2  H20:    -570 km [-773, -368]  a lower on 26/32  -> lower
+  sigma   3.2  H50:    -593 km [-794, -392]  a lower on 27/32  -> lower
+  sigma   6.4  H5 :    -454 km [-640, -269]  a lower on 27/32  -> lower
+  sigma   6.4  H10:    -455 km [-640, -270]  a lower on 27/32  -> lower
+  sigma   6.4  H20:    -470 km [-658, -281]  a lower on 29/32  -> lower
+  sigma   6.4  H50:    -494 km [-708, -280]  a lower on 27/32  -> lower
+  sigma  12.8  H5 :    -487 km [-659, -315]  a lower on 27/32  -> lower
+  sigma  12.8  H10:    -529 km [-708, -350]  a lower on 28/32  -> lower
+  sigma  12.8  H20:    -432 km [-642, -222]  a lower on 27/32  -> lower
+  sigma  12.8  H50:    -535 km [-708, -361]  a lower on 29/32  -> lower
+
+draws: the fixed plan with 64 draws minus the fixed plan with 0
+  sigma     0  N64 - N0:      +3 km [-47, +54]  a lower on 17/32  -> no detectable difference
+  sigma   0.8  N64 - N0:    -168 km [-290, -46]  a lower on 26/32  -> lower
+  sigma   1.6  N64 - N0:    -174 km [-325, -24]  a lower on 25/32  -> lower
+  sigma   3.2  N64 - N0:    -239 km [-405, -73]  a lower on 20/32  -> lower
+  sigma   6.4  N64 - N0:     -39 km [-212, +134]  a lower on 17/32  -> no detectable difference
+  sigma  12.8  N64 - N0:     -46 km [-305, +214]  a lower on 19/32  -> no detectable difference
+
+replanning: MPC (horizon 20, 0 draws) minus the fixed plan (0 draws)
+  sigma     0:    -327 km [-485, -169]  a lower on 24/32  -> lower
+  sigma   0.8:    -349 km [-515, -182]  a lower on 26/32  -> lower
+  sigma   1.6:    -419 km [-578, -260]  a lower on 30/32  -> lower
+  sigma   3.2:    -569 km [-770, -368]  a lower on 24/32  -> lower
+  sigma   6.4:    -489 km [-687, -292]  a lower on 28/32  -> lower
+  sigma  12.8:    -477 km [-659, -296]  a lower on 27/32  -> lower
