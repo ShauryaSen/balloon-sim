@@ -109,6 +109,22 @@ Figures 0 to 7 are the talk. These are the ones to have open behind it, one per 
     many winds the plan saw and not in which ones it drew. Same pattern again, so the effect in 11 is the
     count and not the luck of the draw. (`2026-10-24-nested/lines_cost_km_h20.png`)
 
+15. **did_it_get_there**, the plainest measure in the set: the share of seeds that ever came within the
+   200 km ring, against forecast error, one panel per goal distance. Bars are a proportion's standard error.
+   Hindsight is flat because it knows the wind, and it falls as the task lengthens: it reaches the goal on
+   0.91 of seeds at 1,000 km, 0.78 at 2,000 and 0.53 at 3,000, which is the ceiling the others are chasing.
+   At 1,000 km MPC tracks that ceiling until about 3 m/s and then peels away; at 3,000 km it is below it at
+   every noise level, zero included. Past 6.4 m/s at the two longer distances everything is near zero, so
+   nothing quoted from the high-error end of any other figure is about a task anyone is winning.
+   (`figures/2026-10-24-distance/arrival_rate.png`)
+16. **harder_tasks**: the objective against the goal distance at 3.2 m/s, a line per controller. One picture
+   of the gap to hindsight widening as the task gets harder. Three points a line is a trend, not a curve;
+   nothing between the points means anything. (`figures/2026-10-24-distance/by_distance_sigma3.2.png`)
+
+In the talk these two belong right after figure 2, not at the end: 15 says whether the thing works at all
+before 3 and 4 go into how far ahead it should plan. They are numbered last because they were made after the
+rest of the set, and renumbering the rest would break every reference written before them.
+
 Four items from that list are not here because they have not been run: real GEFS forecasts instead of GP
 draws, more days and seasons, actual storms, and a penalty for arriving too early. Two more, the escape
 objective and the longer episode, are in the sweep running now.
@@ -117,6 +133,9 @@ objective and the longer episode, are in the sweep running now.
 
 - Figure 1 is one seed on one day, chosen because it separates the three controllers cleanly. It is an
   illustration. Seed 0 is the honest counterweight if anyone asks about the spread.
+- Figure 8 is the one place the two MPCs are drawn apart on a measure that is not a distance. At 1,000 km
+  and 12.8 m/s the one that does not learn arrives on 0.66 of seeds against 0.53 for the one that does. The
+  bars overlap and it is 4 seeds, so it is not a claim; it is the same direction as everything else.
 - Figures 3 and 4 show the horizons separating below 3 m/s, but at 0.8 and 1.6 m/s the paired intervals
   overlap almost completely. The ordering among horizons at low noise is not something 32 seeds can
   establish; only the gap between horizon 5 and the rest at sigma 0 is.
