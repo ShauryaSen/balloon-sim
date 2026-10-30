@@ -186,6 +186,24 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     unreachable at every distance tried, 300 km included, because the levels oppose each other at only 58% of
     points: an altitude-only balloon in this record goes downwind or nowhere.
 
+45. **A second objective: escape** (`task.objective = "escape"`). The reach task scores a balloon on getting
+    to one named point, which on an altitude-only vehicle in this record means going downwind or nowhere:
+    decision 44 found no other direction reachable at any distance. So there is a second task with no goal at
+    all, get as far from the start as the wind allows, where the controller is free to use whatever the levels
+    offer rather than being judged on the one bearing the task happened to draw. It is written as a cost,
+    minus the distance from the start summed over the moves, so lower is still better, hindsight is still the
+    floor, and every reader of `cost_km` stays correct without a special case. The arrival rule does not apply
+    to it; there is nowhere to arrive. In the planner it is the same code with the sign flipped and the start
+    passed where the goal would be.
+
+46. **Episode length is an axis** (`episode_lengths = (50, 80)`), because the distance arm moved the goal from
+    1,000 to 3,000 km without giving the balloon any more time to reach it, so a farther goal is also a goal
+    that must be reached sooner and the two cannot be told apart inside that arm. The length arm holds the
+    distance and moves the clock instead, at 2,000 km and at 3,000. 80 moves is 240 h, the whole record;
+    past that the wind is held at the final frame rather than carrying on, so nothing longer is honest. MPC's
+    lookahead already reaches into that held region on the last few moves of an 80-move episode, which is a
+    known and small artifact of the longer arm.
+
 ## Open
 
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.

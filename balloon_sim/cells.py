@@ -37,6 +37,10 @@ BASE_GOAL_KM = 2000.0
 """The goal distance the main arm and every side arm except the distance arm use. Chosen by the scouting
 arm (docs/scouting-rule.md): the only task of twenty that is both reachable and not free"""
 
+BASE_MOVES = 50
+"""The episode length every arm but the length arm uses, in three-hour moves: 6.25 days. It is
+TaskConfig.n_moves, named here so a reader can pick one arm out of a sweep without building a config"""
+
 BASE_DIRECTION = "downwind"
 """Where the goal sits relative to the flow, for every arm but the scouting one. The scouting arm kept it:
 crosswind, upwind and random were unreachable at every distance it tried, even 300 km"""
@@ -52,6 +56,8 @@ class Cell(NamedTuple):
     goal_km: float  # how far downwind the goal is
     belief_scale: float  # what the belief assumes the error is, as a multiple of sigma; 1 is calibrated
     nested: bool  # whether the draws are a subset of one shared pool rather than drawn fresh
+    n_moves: int  # length of the episode, in three-hour moves
+    objective: str  # "reach" the goal, or "escape" as far from the start as the wind allows
 
 
 def _ladder(experiment: ExperimentConfig, fitted_sigma: float) -> list[float]:
@@ -67,11 +73,11 @@ def main_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) ->
     """
     out: list[Cell] = []
     for seed in experiment.seeds:
-        out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, n_moves, 0, BASE_GOAL_KM, 1.0, False))
+        out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, n_moves, 0, BASE_GOAL_KM, 1.0, False, n_moves, "reach"))
         for sigma in _ladder(experiment, fitted_sigma):
-            out.extend(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, n, BASE_GOAL_KM, 1.0, False) for n in experiment.fixed_plan_n_winds)
+            out.extend(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, n, BASE_GOAL_KM, 1.0, False, n_moves, "reach") for n in experiment.fixed_plan_n_winds)
             out.extend(
-                Cell(which, seed, BASE_DIRECTION, sigma, horizon, n, BASE_GOAL_KM, 1.0, False)
+                Cell(which, seed, BASE_DIRECTION, sigma, horizon, n, BASE_GOAL_KM, 1.0, False, n_moves, "reach")
                 for which, draws in (("mpc", experiment.mpc_n_winds), ("mpc_blind", (0,)))
                 for n in draws
                 for horizon in experiment.horizons
@@ -91,10 +97,10 @@ def distance_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float
         if goal_km == BASE_GOAL_KM:
             continue  # the main arm already flies it
         for seed in experiment.seeds:
-            out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, n_moves, 0, goal_km, 1.0, False))
+            out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, n_moves, 0, goal_km, 1.0, False, n_moves, "reach"))
             for sigma in _ladder(experiment, fitted_sigma):
-                out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, 0, goal_km, 1.0, False))
-                out.extend(Cell(which, seed, BASE_DIRECTION, sigma, BASE_HORIZON, 0, goal_km, 1.0, False) for which in ("mpc", "mpc_blind"))
+                out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, 0, goal_km, 1.0, False, n_moves, "reach"))
+                out.extend(Cell(which, seed, BASE_DIRECTION, sigma, BASE_HORIZON, 0, goal_km, 1.0, False, n_moves, "reach") for which in ("mpc", "mpc_blind"))
     return out
 
 
@@ -111,8 +117,8 @@ def calibration_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: fl
             if sigma == 0.0:
                 continue
             for scale in experiment.belief_scales:
-                out.extend(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, n, BASE_GOAL_KM, scale, False) for n in (0, 16))
-                out.extend(Cell("mpc", seed, BASE_DIRECTION, sigma, BASE_HORIZON, n, BASE_GOAL_KM, scale, False) for n in (0, 16))
+                out.extend(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, n, BASE_GOAL_KM, scale, False, n_moves, "reach") for n in (0, 16))
+                out.extend(Cell("mpc", seed, BASE_DIRECTION, sigma, BASE_HORIZON, n, BASE_GOAL_KM, scale, False, n_moves, "reach") for n in (0, 16))
     return out
 
 
@@ -127,8 +133,8 @@ def nested_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) 
     for seed in experiment.seeds:
         for sigma in loud:
             for n in (1, 4, experiment.nested_pool):
-                out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, n, BASE_GOAL_KM, 1.0, True))
-                out.append(Cell("mpc", seed, BASE_DIRECTION, sigma, BASE_HORIZON, n, BASE_GOAL_KM, 1.0, True))
+                out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, n, BASE_GOAL_KM, 1.0, True, n_moves, "reach"))
+                out.append(Cell("mpc", seed, BASE_DIRECTION, sigma, BASE_HORIZON, n, BASE_GOAL_KM, 1.0, True, n_moves, "reach"))
     return out
 
 
@@ -149,15 +155,66 @@ def scout_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -
     for direction in experiment.scout_directions:
         for goal_km in experiment.scout_distances:
             for seed in experiment.seeds:
-                out.append(Cell("hindsight", seed, direction, 0.0, n_moves, 0, goal_km, 1.0, False))
-                out.append(Cell("fixed_plan", seed, direction, sigma, n_moves, 0, goal_km, 1.0, False))
+                out.append(Cell("hindsight", seed, direction, 0.0, n_moves, 0, goal_km, 1.0, False, n_moves, "reach"))
+                out.append(Cell("fixed_plan", seed, direction, sigma, n_moves, 0, goal_km, 1.0, False, n_moves, "reach"))
     return out
 
 
-ARMS = {"scout": scout_arm, "main": main_arm, "distance": distance_arm, "calibration": calibration_arm, "nested": nested_arm}
+def length_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> list[Cell]:
+    """The same tasks with more time: the longer episode at the base goal and at the farthest one.
+
+    The distance arm moved the goal out to 3,000 km without giving the balloon any longer to get there, so a
+    goal that is farther away is also a goal that must be reached sooner, and the two cannot be told apart in
+    it. This arm holds the distance and moves the time instead, at 2,000 km where the sweep lives and at
+    3,000 where the squeeze is worst. Where the longer episode changes the 3,000 km result and not the
+    2,000 km one, what the distance arm measured was partly the clock.
+
+    One horizon and the belief's mean, as in the distance arm: the question is whether the ordering holds,
+    not how the horizon behaves. Note that MPC's lookahead now reaches past the end of the record on the last
+    few moves, where the wind is held at its final frame rather than carrying on.
+    """
+    out: list[Cell] = []
+    longer = max(experiment.episode_lengths)
+    for goal_km in (BASE_GOAL_KM, max(experiment.goal_distances)):
+        for seed in experiment.seeds:
+            out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, longer, 0, goal_km, 1.0, False, longer, "reach"))
+            for sigma in _ladder(experiment, fitted_sigma):
+                out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, longer, 0, goal_km, 1.0, False, longer, "reach"))
+                out.extend(
+                    Cell(which, seed, BASE_DIRECTION, sigma, BASE_HORIZON, 0, goal_km, 1.0, False, longer, "reach")
+                    for which in ("mpc", "mpc_blind")
+                )
+    return out
 
 
-SWEEP = ("main", "distance", "calibration", "nested")
+def escape_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> list[Cell]:
+    """The other objective: get as far from the start as the wind allows, with no goal at all.
+
+    Everything else here scores a balloon on reaching one point, which on an altitude-only vehicle in this
+    record means going downwind or nowhere: the scouting arm found no other direction reachable at any
+    distance. This arm asks whether the controllers order the same way when the task does not name a
+    direction at all, so a controller may use whatever the levels offer instead of being judged on the one
+    bearing the task happened to draw.
+
+    The goal columns still carry the drawn goal and nothing reads them: the cost is minus the distance from
+    the start, summed over the moves, so lower is still better and hindsight is still the floor.
+    """
+    out: list[Cell] = []
+    for seed in experiment.seeds:
+        out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, n_moves, 0, BASE_GOAL_KM, 1.0, False, n_moves, "escape"))
+        for sigma in _ladder(experiment, fitted_sigma):
+            out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, 0, BASE_GOAL_KM, 1.0, False, n_moves, "escape"))
+            out.extend(
+                Cell(which, seed, BASE_DIRECTION, sigma, experiment.escape_horizon, 0, BASE_GOAL_KM, 1.0, False, n_moves, "escape")
+                for which in ("mpc", "mpc_blind")
+            )
+    return out
+
+
+ARMS = {"scout": scout_arm, "main": main_arm, "distance": distance_arm, "calibration": calibration_arm, "nested": nested_arm, "length": length_arm, "escape": escape_arm}
+
+
+SWEEP = ("main", "distance", "calibration", "nested", "length", "escape")
 """The sweep proper: everything except the scouting arm, which is run first and on its own"""
 
 

@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.cells import BASE_GOAL_KM
+from balloon_sim.cells import BASE_GOAL_KM, BASE_MOVES
 from balloon_sim.results import best_hindsight, one_arm, read_rows
 
 METRICS = {
@@ -323,6 +323,8 @@ def arm(ask: argparse.ArgumentParser) -> None:
     ask.add_argument("--goal-km", type=float, default=None, help=f"goal distance (default {BASE_GOAL_KM:g}, the main arm)")
     ask.add_argument("--belief-scale", type=float, default=1.0, help="what the belief assumed the error was, as a multiple")
     ask.add_argument("--nested", action="store_true", help="read the nested-draw arm instead of the fresh-draw one")
+    ask.add_argument("--n-moves", type=int, default=None, help=f"episode length (default {BASE_MOVES:g}; the length arm is longer)")
+    ask.add_argument("--objective", choices=("reach", "escape"), default="reach", help="which objective the arm flew")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -332,10 +334,13 @@ def main(argv: list[str] | None = None) -> None:
     ask.add_argument("--into", default="figures", help="where the figures are written")
     asked = ask.parse_args(argv)
 
-    chosen = one_arm(read_rows(asked.rows), asked.goal_km, asked.belief_scale, asked.nested)
+    if asked.objective == "escape":  # cost_km is then minus the distance from the start, summed
+        METRICS["cost_km"] = "the objective: minus distance from the start, summed (km)"
+    chosen = one_arm(read_rows(asked.rows), asked.goal_km, asked.belief_scale, asked.nested, asked.n_moves, asked.objective)
     if not chosen:
-        sys.exit("no rows in that arm; --goal-km, --belief-scale and --nested pick one")
-    print(f"# arm: goal {asked.goal_km or BASE_GOAL_KM:g} km, belief scale {asked.belief_scale:g}, "
+        sys.exit("no rows in that arm; --goal-km, --n-moves, --objective, --belief-scale and --nested pick one")
+    print(f"# arm: {asked.objective}, goal {asked.goal_km or BASE_GOAL_KM:g} km, "
+          f"{asked.n_moves or BASE_MOVES:g} moves, belief scale {asked.belief_scale:g}, "
           f"draws {'nested' if asked.nested else 'fresh'}")
     rows = best_hindsight(chosen)  # hindsight: the best search found on the true wind
     drawn_metrics = {m: name for m, name in METRICS.items() if any(m in r for r in rows)}  # older rows lack some

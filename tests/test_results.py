@@ -10,7 +10,7 @@ from balloon_sim.task import Task
 
 TASK = Task(State(jnp.array(30.0), jnp.array(150.0), jnp.array(17.5), jnp.array(0.0)), jnp.array(31.0), jnp.array(151.0))
 # a flight that never moves: three moves all at the start, so every move is equally close to the goal
-FLIGHT = Flight(jnp.zeros(3), TASK.start, jnp.array(1234.5), jnp.array(67.8), jnp.array(1234.5), jnp.array(False), jnp.array(0))
+FLIGHT = Flight(jnp.zeros(3), TASK.start, jnp.array(1234.5), jnp.array(67.8), jnp.array(1234.5), jnp.array(False), jnp.array(0), jnp.array(900.0), jnp.array(850.0))
 
 
 def test_a_row_flattens_every_setting_and_carries_the_metrics():

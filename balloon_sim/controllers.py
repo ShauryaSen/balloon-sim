@@ -35,13 +35,14 @@ def _open_loop(
     goal_lon: jax.Array,
     n_moves: int,
     arrival_km: float = 0.0,
+    away: bool = False,
 ) -> Controller:
     """Plans all n_moves climbs once, on the winds winds_for gives, then flies them without looking"""
     whole_episode = dataclasses.replace(planner, horizon=n_moves)
 
     def begin(key: jax.Array, state: State) -> jax.Array:
         k_winds, k_plan = jax.random.split(key)
-        return plan(balloon, whole_episode, k_plan, winds_for(k_winds), state, goal_lat, goal_lon, jnp.zeros(n_moves), jnp.array(n_moves), arrival_km)
+        return plan(balloon, whole_episode, k_plan, winds_for(k_winds), state, goal_lat, goal_lon, jnp.zeros(n_moves), jnp.array(n_moves), arrival_km, away)
 
     def act(memory: jax.Array, key: jax.Array, state: State, move: jax.Array, reading: jax.Array) -> tuple[jax.Array, jax.Array]:
         return memory[move], memory  # the planned climb for this move; the plan itself never changes
@@ -58,11 +59,12 @@ def fixed_plan(
     n_moves: int,
     n_winds: int,
     arrival_km: float = 0.0,
+    away: bool = False,
 ) -> Controller:
     """Plans the whole episode once, on n_winds draws from the belief (its mean alone when n_winds is 0), before
     any reading is taken. The floor"""
     nothing_read = Readings.empty(1)
-    return _open_loop(balloon, planner, lambda key: belief.winds(key, n_winds, nothing_read), goal_lat, goal_lon, n_moves, arrival_km)
+    return _open_loop(balloon, planner, lambda key: belief.winds(key, n_winds, nothing_read), goal_lat, goal_lon, n_moves, arrival_km, away)
 
 
 class MPCMemory(NamedTuple):
@@ -80,6 +82,7 @@ def mpc(
     n_moves: int,
     arrival_km: float = 0.0,
     learns: bool = True,
+    away: bool = False,
 ) -> Controller:
     """Every move: read the wind here and give it to the belief, draw n_winds fresh winds from the belief (its
     mean alone when n_winds is 0), plan the next planner.horizon moves from where the balloon really is (only
@@ -99,7 +102,7 @@ def mpc(
         readings = memory.readings.add(state, reading)
         given = readings if learns else memory.readings  # not learning: the reading is taken and set aside
         k_winds, k_plan = jax.random.split(key)
-        climbs = plan(balloon, planner, k_plan, belief.winds(k_winds, n_winds, given), state, goal_lat, goal_lon, memory.previous, n_moves - move, arrival_km)
+        climbs = plan(balloon, planner, k_plan, belief.winds(k_winds, n_winds, given), state, goal_lat, goal_lon, memory.previous, n_moves - move, arrival_km, away)
         shifted = jnp.concatenate([climbs[1:], jnp.zeros(1)])  # the rest of this plan, then coast
         return climbs[0], MPCMemory(shifted, readings)
 
@@ -107,7 +110,14 @@ def mpc(
 
 
 def hindsight(
-    balloon: BalloonConfig, planner: PlannerConfig, truth: WindField, goal_lat: jax.Array, goal_lon: jax.Array, n_moves: int, arrival_km: float = 0.0
+    balloon: BalloonConfig,
+    planner: PlannerConfig,
+    truth: WindField,
+    goal_lat: jax.Array,
+    goal_lon: jax.Array,
+    n_moves: int,
+    arrival_km: float = 0.0,
+    away: bool = False,
 ) -> Controller:
     """Knows the true wind: replans every move on the truth over the whole episode. The ceiling.
 
@@ -115,4 +125,4 @@ def hindsight(
     two have the same optimum, and re-solving from the true position every move is the stronger search: one
     solve from a random pool left MPC on a perfect forecast beating it by a tenth. What is left is still only
     the best plan our optimiser found, which DESIGN.md names as hindsight's one approximation"""
-    return mpc(balloon, dataclasses.replace(planner, horizon=n_moves), Truth(truth), goal_lat, goal_lon, 0, n_moves, arrival_km)
+    return mpc(balloon, dataclasses.replace(planner, horizon=n_moves), Truth(truth), goal_lat, goal_lon, 0, n_moves, arrival_km, away=away)

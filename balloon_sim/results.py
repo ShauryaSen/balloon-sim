@@ -7,7 +7,12 @@ One row is one flight. Its columns:
     <piece>.<field>       every setting the flight ran with, e.g. "planner.horizon", "belief.sigma"
     start_lat, start_lon, goal_lat, goal_lon
     summed_km, final_km   distance to the goal summed over every move, and after the last move
-    cost_km               the objective: summed until the balloon arrives, nothing after (the arrival rule)
+    cost_km               the objective. "reach": distance to the goal summed until the balloon arrives,
+                          nothing after (the arrival rule). "escape": minus the distance from the start,
+                          summed over every move, so lower is better in both and hindsight is still the floor
+    objective             "reach" the goal, or "escape" as far from the start as the wind allows
+    farthest_km           the farthest the balloon ever got from its start
+    escape_final_km       how far from its start it finished
     arrived, arrived_move whether it ever came within task.arrival_km, and the move it first did (0 if never)
     closest_km, closest_move   the nearest the balloon came to the goal, and after which move (from 1)
     goal_km, direction    how far the goal was placed and where, relative to the flow at the start
@@ -26,7 +31,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from balloon_sim.cells import BASE_GOAL_KM
+from balloon_sim.cells import BASE_GOAL_KM, BASE_MOVES
 from balloon_sim.dynamics import distance_km
 from balloon_sim.episode import Flight
 from balloon_sim.task import Task
@@ -63,6 +68,8 @@ def row(
         summed_km=float(flight.summed_km),
         final_km=float(flight.final_km),
         cost_km=float(flight.cost_km),
+        farthest_km=float(flight.farthest_km),
+        escape_final_km=float(flight.escape_final_km),
         arrived=bool(flight.arrived),
         arrived_move=int(flight.arrived_move),
         closest_km=float(jnp.min(along)),
@@ -108,8 +115,16 @@ def read_rows(paths: list[str | Path]) -> list[dict]:
 CLAIRVOYANT_METRICS = ("summed_km", "final_km", "closest_km", "cost_km")
 
 
-def one_arm(rows: list[dict], goal_km: float | None = None, belief_scale: float = 1.0, nested: bool = False) -> list[dict]:
-    """The rows of a single arm of the sweep: one goal distance, one belief calibration, draws fresh or nested.
+def one_arm(
+    rows: list[dict],
+    goal_km: float | None = None,
+    belief_scale: float = 1.0,
+    nested: bool = False,
+    n_moves: int | None = None,
+    objective: str = "reach",
+) -> list[dict]:
+    """The rows of a single arm: one goal distance, one episode length, one objective, one belief
+    calibration, draws fresh or nested.
 
     The arms share controller names, horizons, draw counts and noise levels, so a row is only identified by
     all of its settings together. A summary that groups on the controller alone silently mixes cells that
@@ -117,13 +132,20 @@ def one_arm(rows: list[dict], goal_km: float | None = None, belief_scale: float 
     ones seed by seed. Every reader picks an arm first.
 
     Rows written before an arm existed do not carry its column. Those are kept, since a sweep with one arm
-    is one arm; it is only a sweep with several that has to choose.
+    is one arm; it is only a sweep with several that has to choose. The objective is the exception: a row
+    with no objective column was written before the escape arm existed, and every one of those flew the
+    reach task, so it is read as "reach" rather than as whatever was asked for.
     """
     goal_km = BASE_GOAL_KM if goal_km is None else goal_km
+    n_moves = BASE_MOVES if n_moves is None else n_moves
 
     def belongs(r: dict) -> bool:
         if r.get("goal_km", goal_km) != goal_km:
             return False  # a different goal is a different task, for every controller including hindsight
+        if r.get("task.n_moves", n_moves) != n_moves:
+            return False  # so is the same goal with a different amount of time to reach it
+        if r.get("objective", "reach") != objective:
+            return False  # and an episode scored on getting away is not the same episode at all
         if r["controller"] == "hindsight":
             return True  # it reads the truth, so neither the belief's calibration nor its draws reach it
         return r.get("belief_scale", belief_scale) == belief_scale and bool(r.get("nested", nested)) == nested

@@ -35,6 +35,7 @@ def expected_cost(
     goal_lon: jax.Array,
     remaining: jax.Array,
     arrival_km: float = 0.0,
+    away: bool = False,
 ) -> jax.Array:
     """J(a, w) for each wind w in the batch, averaged. Only moves the episode is still running for count: the
     rest of the horizon would be flown after the episode ends, so it must not steer the plan. Under the
@@ -44,14 +45,19 @@ def expected_cost(
     The mask depends on the plan, since where a plan arrives decides what it is charged for, so the objective
     is piecewise smooth rather than smooth. Inside a piece the gradient is the one L-BFGS wants, and the pool
     of 102 starting plans is what carries the search across the pieces.
+
+    With `away` the sign is flipped and the point passed as the goal is the start, so the planner is
+    maximising the distance from where it launched rather than minimising the distance to a goal
+    (decision 45). There is no arrival in that task, so the caller passes arrival_km = 0 with it.
     """
     last = jnp.clip(remaining - 1, 0, planner.horizon - 1)  # the move the episode ends on
 
     def in_one_wind(w: WindField) -> jax.Array:
         visited = rollout(w, state, balloon.climb_cap_km * a, balloon.step_hours, balloon.substeps)
         distance = distance_km(visited.lat, visited.lon, goal_lat, goal_lon)  # (H,) after each move
+        signed = -distance if away else distance  # away: far from the start is cheap, near it is dear
         keep = counted(distance, arrival_km, remaining)
-        return jnp.sum(jnp.where(keep, distance, 0.0)) if planner.cost == "summed" else distance[last]
+        return jnp.sum(jnp.where(keep, signed, 0.0)) if planner.cost == "summed" else signed[last]
 
     return jnp.mean(jax.vmap(in_one_wind, in_axes=(BATCHED,))(winds))
 
@@ -120,7 +126,7 @@ def _lbfgs(planner: PlannerConfig, loss, z: jax.Array) -> jax.Array:
     return _best_so_far(loss, z, improve, planner.iterations, solver.init(z))
 
 
-@functools.partial(jax.jit, static_argnames=("balloon", "planner"))
+@functools.partial(jax.jit, static_argnames=("balloon", "planner", "away"))
 def plan(
     balloon: BalloonConfig,
     planner: PlannerConfig,
@@ -132,10 +138,11 @@ def plan(
     previous_km: jax.Array,
     remaining: jax.Array,
     arrival_km: float = 0.0,
+    away: bool = False,
 ) -> jax.Array:
     """The H climbs (km) with the lowest cost averaged over the batch of winds, counting only the moves the
     episode is still running for: those left in it, and those before the plan arrives"""
-    J = lambda a: expected_cost(balloon, planner, a, winds, state, goal_lat, goal_lon, remaining, arrival_km)
+    J = lambda a: expected_cost(balloon, planner, a, winds, state, goal_lat, goal_lon, remaining, arrival_km, away)
 
     # 1-2: the pool, every plan scored once, the best few kept
     pool = candidates(balloon, planner, key, state, previous_km, winds.altitude_km[0], winds.altitude_km[-1])

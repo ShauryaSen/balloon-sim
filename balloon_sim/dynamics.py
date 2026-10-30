@@ -105,6 +105,25 @@ def arrival(visited: State, goal_lat: jax.Array, goal_lon: jax.Array, arrival_km
     return ever, jnp.where(ever, jnp.argmax(arrived) + 1, 0)
 
 
+def escape_cost(visited: State, start_lat: jax.Array, start_lon: jax.Array) -> jax.Array:
+    """The other objective (decision 45): get as far from the start as you can, summed over the moves.
+
+    Written as a cost, so it is minus the distance and lower is still better. That keeps every reader that
+    treats cost_km as a cost correct without a special case: hindsight is still the lowest line, and
+    "MPC minus hindsight" is still how much worse MPC did. The numbers are negative, which the figures say.
+
+    There is no arrival rule here. Arriving is the other task; this one has nowhere to arrive, so every move
+    of the episode counts.
+    """
+    return -jnp.sum(distance_km(visited.lat, visited.lon, start_lat, start_lon))
+
+
+def farthest(visited: State, start_lat: jax.Array, start_lon: jax.Array) -> jax.Array:
+    """The farthest the balloon ever got from its start, in km. A plain positive number for the tables, where
+    escape_cost is the thing the planner minimises"""
+    return jnp.max(distance_km(visited.lat, visited.lon, start_lat, start_lon))
+
+
 def summed_cost(visited: State, goal_lat: jax.Array, goal_lon: jax.Array) -> jax.Array:
     """J = distance to the goal after each move, summed over the moves, in km"""
     return jnp.sum(distance_km(visited.lat, visited.lon, goal_lat, goal_lon))

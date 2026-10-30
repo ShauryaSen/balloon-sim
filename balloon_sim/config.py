@@ -44,6 +44,13 @@ class TaskConfig:
     """Where an episode starts and where its goal is (decision 18)"""
 
     mode: Literal["random", "fixed"] = "random"
+    objective: Literal["reach", "escape"] = "reach"
+    """What the episode is for (decision 45). "reach" is the task every sweep so far has flown: get to the
+    goal and get there soon, scored by distance to the goal summed until arrival. "escape" has no goal at
+    all: get as far from the start as the wind allows, scored by distance from the start summed over every
+    move. The arrival rule does not apply to it, and its cost is written negative so that lower is still
+    better and hindsight is still the floor"""
+
     n_moves: int = 50  # length of an episode: 50 three-hour moves is 6.25 days of the 10-day record
     arrival_km: float = 200.0
     """The episode ends the first time the balloon is this close, and the moves after it cost nothing, so the
@@ -113,6 +120,16 @@ class ExperimentConfig:
     a quarter, a half, one, two and four times a real 24 h forecast whatever record is flown. Denser below the
     real error than above it, because the zermelo sweep found performance flat up to about half of it and
     falling smoothly after"""
+
+    episode_lengths: tuple[int, ...] = (50, 80)
+    """Moves in an episode. 50 is 6.25 days, what every sweep so far flew; 80 is 240 h, the whole 10-day
+    record, and the point of it is that the distance arm moved the goal out to 3,000 km without giving the
+    balloon any more time to get there. Longer than 80 would fly past the end of the record, where the wind
+    is held at the last frame rather than carrying on"""
+
+    escape_horizon: int = 20
+    """The MPC horizon the escape arm holds fixed. One horizon, because the question there is whether the
+    ordering between the controllers survives a different objective, not how the horizon behaves under it"""
 
     horizons: tuple[int, ...] = (5, 10, 20, 50)
     """Moves the MPC plans ahead: a doubling ladder (1.25, 2.5 and 5 days) up to the whole 50-move episode,

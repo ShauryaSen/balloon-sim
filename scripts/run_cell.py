@@ -58,6 +58,8 @@ def parser() -> argparse.ArgumentParser:
     ask.add_argument("--nested", action="store_true",
                      help="draw one pool of --nested-pool winds and use the first --n-winds of it")
     ask.add_argument("--nested-pool", type=int, default=16, help="the pool the nested draws come from")
+    ask.add_argument("--objective", choices=("reach", "escape"), help="what the episode is for, overriding task.objective")
+    ask.add_argument("--n-moves", type=int, help="length of the episode in moves, overriding task.n_moves")
     ask.add_argument("--keep-path", action="store_true", help="also record the trajectory in the row")
     ask.add_argument("--out", default="results/rows.jsonl", help="the .jsonl the row is added to")
     for piece, config in PIECES.items():
@@ -86,6 +88,10 @@ def build(asked: dict):
         pieces["task"] = dataclasses.replace(pieces["task"], distance_km=asked["goal_km"])
     if asked.get("direction") is not None:
         pieces["task"] = dataclasses.replace(pieces["task"], direction=asked["direction"])
+    if asked.get("objective") is not None:
+        pieces["task"] = dataclasses.replace(pieces["task"], objective=asked["objective"])
+    if asked.get("n_moves") is not None:
+        pieces["task"] = dataclasses.replace(pieces["task"], n_moves=asked["n_moves"])
     return pieces
 
 
@@ -106,34 +112,44 @@ def main(argv: list[str] | None = None) -> None:
     if asked["nested"]:
         believed = Nested(believed, asked["nested_pool"])
 
-    n_moves, n_winds, radius = task_config.n_moves, asked["n_winds"], task_config.arrival_km
+    n_moves, n_winds = task_config.n_moves, asked["n_winds"]
+    # Escaping has nowhere to arrive, so the arrival rule is off, and the point the planner is pointed at is
+    # the start rather than the goal: with `away` the sign is flipped, so it runs from there instead of to it.
+    away = task_config.objective == "escape"
+    radius = 0.0 if away else task_config.arrival_km
+    aim_lat, aim_lon = (task.start.lat, task.start.lon) if away else (task.goal_lat, task.goal_lon)
     if asked["controller"] == "hindsight":
-        controller = hindsight(balloon, planner, truth, task.goal_lat, task.goal_lon, n_moves, radius)
+        controller = hindsight(balloon, planner, truth, aim_lat, aim_lon, n_moves, radius, away)
     elif asked["controller"] == "fixed_plan":
-        controller = fixed_plan(balloon, planner, believed, task.goal_lat, task.goal_lon, n_moves, n_winds, radius)
+        controller = fixed_plan(balloon, planner, believed, aim_lat, aim_lon, n_moves, n_winds, radius, away)
     else:
-        controller = mpc(balloon, planner, believed, task.goal_lat, task.goal_lon, n_winds, n_moves, radius,
-                         learns=asked["controller"] == "mpc")
+        controller = mpc(balloon, planner, believed, aim_lat, aim_lon, n_winds, n_moves, radius,
+                         learns=asked["controller"] == "mpc", away=away)
 
     began = time.perf_counter()
-    flight = fly(balloon, controller, truth, task.start, task.goal_lat, task.goal_lon, n_moves, k_fly, radius)
+    flight = fly(balloon, controller, truth, task.start, task.goal_lat, task.goal_lon, n_moves, k_fly, radius, away)
     jax.block_until_ready(flight.summed_km)  # JAX is lazy, so the clock would otherwise stop before the flight
     seconds = time.perf_counter() - began
 
     written = row(
         flight, task, controller=asked["controller"], n_winds=n_winds, seed=asked["seed"], seconds=seconds, settings=pieces,
         extra={"goal_km": task_config.distance_km, "direction": task_config.direction,
-               "belief_scale": asked["belief_scale"], "nested": asked["nested"]},
+               "belief_scale": asked["belief_scale"], "nested": asked["nested"],
+               "objective": task_config.objective},
         keep_path=asked["keep_path"],
     )
     Path(asked["out"]).parent.mkdir(parents=True, exist_ok=True)
     write_rows(asked["out"], [written])
-    reached = f"move {int(flight.arrived_move):2d}" if bool(flight.arrived) else "   never"
-    print(f"{asked['controller']:10s} seed {asked['seed']:3d} sigma {asked['sigma']:5.2f} "
-          f"horizon {planner.horizon:3d} n_winds {n_winds:2d} "
-          f"goal {task_config.distance_km:5.0f} km {task_config.direction:9s} "
-          f"scale {asked['belief_scale']:3.1f}  cost {float(flight.cost_km):10.1f} km  "
-          f"arrived {reached}  final {float(flight.final_km):8.1f} km  {seconds:6.1f} s")
+    common = (f"{asked['controller']:10s} seed {asked['seed']:3d} sigma {asked['sigma']:5.2f} "
+              f"horizon {planner.horizon:3d} n_winds {n_winds:2d} moves {n_moves:3d} "
+              f"scale {asked['belief_scale']:3.1f}  cost {float(flight.cost_km):10.1f} km")
+    if away:
+        print(f"{common}  farthest {float(flight.farthest_km):8.1f} km  "
+              f"ended {float(flight.escape_final_km):8.1f} km out  {seconds:6.1f} s")
+    else:
+        reached = f"move {int(flight.arrived_move):2d}" if bool(flight.arrived) else "   never"
+        print(f"{common}  goal {task_config.distance_km:5.0f} km {task_config.direction:9s}  "
+              f"arrived {reached}  final {float(flight.final_km):8.1f} km  {seconds:6.1f} s")
 
 
 if __name__ == "__main__":

@@ -55,7 +55,8 @@ def flags(cell, pool: int, keep_path: bool) -> str:
     """One cell as the arguments run_cell.py takes"""
     out = (f"--controller {cell.controller} --seed {cell.seed} --sigma {cell.sigma} "
            f"--horizon {cell.horizon} --n-winds {cell.n_winds} --goal-km {cell.goal_km} "
-           f"--direction {cell.direction} --belief-scale {cell.belief_scale}")
+           f"--direction {cell.direction} --belief-scale {cell.belief_scale} "
+           f"--n-moves {cell.n_moves} --objective {cell.objective}")
     if cell.nested:
         out += f" --nested --nested-pool {pool}"
     if keep_path:
