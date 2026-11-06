@@ -18,6 +18,10 @@ One row is one flight. Its columns:
     goal_km, direction    how far the goal was placed and where, relative to the flow at the start
     belief_scale          what the belief assumed the error was, as a multiple of the real one; 1 is calibrated
     nested                whether the draws were a subset of one shared pool rather than drawn fresh
+    n_agents              balloons in the fleet (absent: 1). A fleet row, and any station or targets row, is
+                          written by balloon_sim/fleet.py's fleet_row, which documents what the goal-distance
+                          columns mean there and adds starts_*, targets_*, arrived_count, visited_count and
+                          covered_fraction
     path_lat, path_lon, path_altitude_km   the trajectory, when the cell was asked to keep it
     seconds               how long the flight took
 Rows are stored as JSON lines: one row per line of a .jsonl file. A sweep writes one file per cell under a
@@ -122,6 +126,7 @@ def one_arm(
     nested: bool = False,
     n_moves: int | None = None,
     objective: str = "reach",
+    n_agents: int = 1,
 ) -> list[dict]:
     """The rows of a single arm: one goal distance, one episode length, one objective, one belief
     calibration, draws fresh or nested.
@@ -146,6 +151,8 @@ def one_arm(
             return False  # so is the same goal with a different amount of time to reach it
         if r.get("objective", "reach") != objective:
             return False  # and an episode scored on getting away is not the same episode at all
+        if r.get("n_agents", 1) != n_agents:
+            return False  # nor is a fleet; rows from before fleets existed all flew one balloon
         if r["controller"] == "hindsight":
             return True  # it reads the truth, so neither the belief's calibration nor its draws reach it
         return r.get("belief_scale", belief_scale) == belief_scale and bool(r.get("nested", nested)) == nested

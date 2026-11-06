@@ -204,6 +204,23 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     lookahead already reaches into that held region on the last few moves of an 80-move episode, which is a
     known and small artifact of the longer arm.
 
+47. **Two more objectives: station and targets** (`task.objective`). *Station*: hold the drawn start, scored
+    at every move by how far the nearest balloon is outside a circle of `task.arrival_km` round it, summed
+    over the moves; zero while inside. The hinge rather than the plain distance, so the cost is the Loon
+    task (time on station) and not "stay at the exact centre"; the price is no gradient while inside, where
+    the candidate pool still ranks plans. *Targets*: `task.n_targets` stops chained downwind from the start,
+    `distance_km / n_targets` apart along the flow at each stop, visited in any order; each unvisited stop
+    costs its distance to the nearest balloon every move until one comes within the radius, so a single
+    stop is exactly the reach task. Both flown by `balloon_sim/fleet.py`, also with one balloon.
+48. **A fleet** (`task.n_agents`): N balloons, balloon 0 on the drawn start and the rest on a ring of
+    `task.spread_km` (150 km) about it, in the same weather and toward the same points as that seed's single
+    balloon. One shared belief, given every balloon's reading every move; one joint plan of N x H climbs,
+    refined together against one cost. Reach and escape average the per-balloon cost; station and targets
+    take the nearest balloon, so they couple the fleet. A fleet of one reproduces the single-balloon
+    planner, controllers and simulator to within float error (`tests/test_fleet.py`), which is why those
+    modules are left as they are and the fleet is its own module. The fleet arm flies all four objectives at
+    `fleet_sizes` (4); its question is what shared readings are worth, read as MPC minus MPC not learning.
+
 ## Open
 
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.

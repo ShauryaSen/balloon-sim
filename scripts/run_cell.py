@@ -58,7 +58,9 @@ def parser() -> argparse.ArgumentParser:
     ask.add_argument("--nested", action="store_true",
                      help="draw one pool of --nested-pool winds and use the first --n-winds of it")
     ask.add_argument("--nested-pool", type=int, default=16, help="the pool the nested draws come from")
-    ask.add_argument("--objective", choices=("reach", "escape"), help="what the episode is for, overriding task.objective")
+    ask.add_argument("--objective", choices=("reach", "escape", "station", "targets"),
+                     help="what the episode is for, overriding task.objective")
+    ask.add_argument("--n-agents", type=int, help="balloons flown together, overriding task.n_agents")
     ask.add_argument("--n-moves", type=int, help="length of the episode in moves, overriding task.n_moves")
     ask.add_argument("--keep-path", action="store_true", help="also record the trajectory in the row")
     ask.add_argument("--out", default="results/rows.jsonl", help="the .jsonl the row is added to")
@@ -92,7 +94,54 @@ def build(asked: dict):
         pieces["task"] = dataclasses.replace(pieces["task"], objective=asked["objective"])
     if asked.get("n_moves") is not None:
         pieces["task"] = dataclasses.replace(pieces["task"], n_moves=asked["n_moves"])
+    if asked.get("n_agents") is not None:
+        pieces["task"] = dataclasses.replace(pieces["task"], n_agents=asked["n_agents"])
     return pieces
+
+
+def is_fleet(task_config) -> bool:
+    """A cell goes through balloon_sim/fleet.py when it has more than one balloon or an objective only the
+    fleet code flies. The single-balloon reach and escape cells stay on the code every sweep so far ran"""
+    return task_config.n_agents > 1 or task_config.objective in ("station", "targets")
+
+
+def run_fleet(asked: dict, pieces: dict, truth, believed, k_task, k_fly) -> None:
+    """The fleet's cell: the same keys and belief as a single-balloon cell, flown by fleet.py"""
+    from balloon_sim import fleet
+
+    balloon, planner, task_config = pieces["balloon"], pieces["planner"], pieces["task"]
+    objective, n_moves, n_winds = task_config.objective, task_config.n_moves, asked["n_winds"]
+    radius = task_config.arrival_km
+    mission, task = fleet.draw_mission(task_config, k_task, truth)
+    if asked["controller"] == "hindsight":
+        controller = fleet.hindsight(balloon, planner, truth, objective, mission, n_moves, radius)
+    elif asked["controller"] == "fixed_plan":
+        controller = fleet.fixed_plan(balloon, planner, believed, objective, mission, n_moves, n_winds, radius)
+    else:
+        controller = fleet.mpc(balloon, planner, believed, objective, mission, n_winds, n_moves, radius,
+                               learns=asked["controller"] == "mpc")
+
+    began = time.perf_counter()
+    flight = fleet.fly(balloon, controller, truth, mission, objective, n_moves, k_fly, radius)
+    jax.block_until_ready(flight.cost_km)
+    seconds = time.perf_counter() - began
+
+    written = fleet.fleet_row(
+        flight, mission, task, controller=asked["controller"], n_winds=n_winds, seed=asked["seed"], seconds=seconds,
+        settings=pieces,
+        extra={"goal_km": task_config.distance_km, "direction": task_config.direction,
+               "belief_scale": asked["belief_scale"], "nested": asked["nested"], "objective": objective},
+        keep_path=asked["keep_path"],
+    )
+    Path(asked["out"]).parent.mkdir(parents=True, exist_ok=True)
+    write_rows(asked["out"], [written])
+    done = {"reach": f"arrived {int(flight.arrived_count)}/{task_config.n_agents}",
+            "escape": f"farthest {float(flight.farthest_km):7.0f} km",
+            "station": f"held {float(flight.covered_fraction):4.0%} of moves",
+            "targets": f"visited {int(flight.visited_count)}/{task_config.n_targets}"}[objective]
+    print(f"{asked['controller']:10s} seed {asked['seed']:3d} sigma {asked['sigma']:5.2f} "
+          f"horizon {planner.horizon:3d} n_winds {n_winds:2d} moves {n_moves:3d} {objective:8s} "
+          f"balloons {task_config.n_agents}  cost {float(flight.cost_km):10.1f} km  {done}  {seconds:6.1f} s")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -102,7 +151,6 @@ def main(argv: list[str] | None = None) -> None:
 
     truth = load_record(wind.path)
     k_task, k_noise, k_fly = keys(asked["seed"])
-    task = draw_task(task_config, k_task, truth)
 
     # The error actually put into the forecast is belief_config's sigma. What the controller believes about
     # that error is the same kernel with its amplitude scaled, so a scale other than 1 is a belief that is
@@ -111,6 +159,9 @@ def main(argv: list[str] | None = None) -> None:
     believed = GPBelief(assumed, forecast(belief_config, k_noise, truth))
     if asked["nested"]:
         believed = Nested(believed, asked["nested_pool"])
+    if is_fleet(task_config):
+        return run_fleet(asked, pieces, truth, believed, k_task, k_fly)
+    task = draw_task(task_config, k_task, truth)
 
     n_moves, n_winds = task_config.n_moves, asked["n_winds"]
     # Escaping has nowhere to arrive, so the arrival rule is off, and the point the planner is pointed at is

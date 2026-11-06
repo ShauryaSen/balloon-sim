@@ -49,11 +49,22 @@ rule the episode does not last the whole budget: a flight that arrived on move 1
 well. They are drawn as what they are, the objective in km, and the axis is large because the objective
 is large."""
 
+SUCCESS = {
+    "arrived_count": "balloons that reached the goal (of the fleet)",
+    "visited_count": "targets visited",
+    "covered_fraction": "fraction of moves the station was held",
+}
+"""Counts the fleet's rows carry (balloon_sim/fleet.py). Higher is better, unlike everything above, so they
+get lines and dots but no score figure, whose guard is written for a cost"""
+
 SHORT = {
     "cost_km": "the objective",
     "summed_km": "summed distance to the goal",
     "final_km": "distance at the end",
     "closest_km": "closest approach",
+    "arrived_count": "balloons arrived",
+    "visited_count": "targets visited",
+    "covered_fraction": "station held",
 }
 """The axis label says what a metric is; a title only has to say which one it is, and the long form was
 running off the right edge of the score figures"""
@@ -371,7 +382,8 @@ def arm(ask: argparse.ArgumentParser) -> None:
     ask.add_argument("--belief-scale", type=float, default=1.0, help="what the belief assumed the error was, as a multiple")
     ask.add_argument("--nested", action="store_true", help="read the nested-draw arm instead of the fresh-draw one")
     ask.add_argument("--n-moves", type=int, default=None, help=f"episode length (default {BASE_MOVES:g}; the length arm is longer)")
-    ask.add_argument("--objective", choices=("reach", "escape"), default="reach", help="which objective the arm flew")
+    ask.add_argument("--objective", choices=("reach", "escape", "station", "targets"), default="reach", help="which objective the arm flew")
+    ask.add_argument("--n-agents", type=int, default=1, help="balloons in the fleet (default 1; the fleet arm is larger)")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -383,10 +395,16 @@ def main(argv: list[str] | None = None) -> None:
 
     if asked.objective == "escape":  # cost_km is then minus the distance from the start, summed
         METRICS["cost_km"] = "the objective: minus distance from the start, summed (km)"
-    chosen = one_arm(read_rows(asked.rows), asked.goal_km, asked.belief_scale, asked.nested, asked.n_moves, asked.objective)
+    elif asked.objective == "station":
+        METRICS["cost_km"] = "the objective: km outside the station's circle, summed (km)"
+    elif asked.objective == "targets":
+        METRICS["cost_km"] = "the objective: distance to each unvisited target, summed (km)"
+    if asked.n_agents > 1 or asked.objective in ("station", "targets"):  # fleet.py's rows: see FleetFlight
+        METRICS.update(SUCCESS)
+    chosen = one_arm(read_rows(asked.rows), asked.goal_km, asked.belief_scale, asked.nested, asked.n_moves, asked.objective, asked.n_agents)
     if not chosen:
         sys.exit("no rows in that arm; --goal-km, --n-moves, --objective, --belief-scale and --nested pick one")
-    print(f"# arm: {asked.objective}, goal {asked.goal_km or BASE_GOAL_KM:g} km, "
+    print(f"# arm: {asked.objective}, {asked.n_agents} balloon(s), goal {asked.goal_km or BASE_GOAL_KM:g} km, "
           f"{asked.n_moves or BASE_MOVES:g} moves, belief scale {asked.belief_scale:g}, "
           f"draws {'nested' if asked.nested else 'fresh'}")
     rows = best_hindsight(chosen)  # hindsight: the best search found on the true wind
@@ -408,8 +426,11 @@ def main(argv: list[str] | None = None) -> None:
             for prefix, chosen in (("", lines), ("plain_", plainly(lines))):
                 draw_lines(chosen, sigmas, metric, into / f"{prefix}lines_{stem}.png", named)
                 draw_dots(chosen, sigmas, metric, into / f"{prefix}dots_{stem}.png", named)
-                draw_score(chosen, sigmas, metric, into / f"{prefix}score_{stem}.png", f"MPC between the bounds: {named}")
+                if metric not in SUCCESS:  # a count is higher-better, and the score's guard assumes a cost
+                    draw_score(chosen, sigmas, metric, into / f"{prefix}score_{stem}.png", f"MPC between the bounds: {named}")
     for metric in drawn_metrics:
+        if metric in SUCCESS:
+            continue  # the horizon, surface and replanning figures are differences of costs
         for n in sorted({r["n_winds"] for r in rows if r["controller"] == "mpc"}):
             draw_horizons(rows, sigmas, horizons, metric, n, into / f"horizons_{metric}_n{n}.png")
             draw_surface(rows, sigmas, horizons, metric, n, into / f"surface_{metric}_n{n}.png")

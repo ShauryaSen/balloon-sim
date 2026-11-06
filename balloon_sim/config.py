@@ -44,12 +44,25 @@ class TaskConfig:
     """Where an episode starts and where its goal is (decision 18)"""
 
     mode: Literal["random", "fixed"] = "random"
-    objective: Literal["reach", "escape"] = "reach"
+    objective: Literal["reach", "escape", "station", "targets"] = "reach"
     """What the episode is for (decision 45). "reach" is the task every sweep so far has flown: get to the
     goal and get there soon, scored by distance to the goal summed until arrival. "escape" has no goal at
     all: get as far from the start as the wind allows, scored by distance from the start summed over every
     move. The arrival rule does not apply to it, and its cost is written negative so that lower is still
-    better and hindsight is still the floor"""
+    better and hindsight is still the floor. "station" holds a point and "targets" visits several, both
+    flown through balloon_sim/fleet.py, which documents them (decision 47)"""
+
+    n_agents: int = 1
+    """Balloons flown together, sharing one belief and planned jointly (decision 48). 1 is the single
+    balloon every sweep before 2026-11-05 flew; above 1 the cell goes through balloon_sim/fleet.py"""
+
+    spread_km: float = 150.0
+    """A fleet's launch: balloon 0 on the drawn start, the rest evenly round a ring this far from it. Inside
+    the arrival radius, so a fleet holding a station starts with every balloon on it, and well inside the
+    belief's 544 km lengthscale, so one balloon's reading tells the others something"""
+
+    n_targets: int = 3
+    """Stops in the targets objective, chained downwind from the start, distance_km / n_targets apart"""
 
     n_moves: int = 50  # length of an episode: 50 three-hour moves is 6.25 days of the 10-day record
     arrival_km: float = 200.0
@@ -142,5 +155,12 @@ class ExperimentConfig:
     fixed_plan_n_winds: tuple[int, ...] = (0, 1, 4, 16, 64)
     """The same for the fixed plan, which solves once so a large N is nearly free; 64 is the best estimate of
     the proxy best-fixed-plan bound"""
+
+    fleet_sizes: tuple[int, ...] = (4,)
+    """Balloons in the fleet arm. One size, so the fleet arm is every objective at one N; add sizes here to
+    see how the value of sharing readings grows with the fleet"""
+
+    new_objective_horizon: int = 20
+    """The MPC horizon the station, targets and fleet arms hold fixed, as the escape arm does"""
 
     controllers: tuple[str, ...] = ("hindsight", "fixed_plan", "mpc")

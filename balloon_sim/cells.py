@@ -41,6 +41,9 @@ BASE_MOVES = 50
 """The episode length every arm but the length arm uses, in three-hour moves: 6.25 days. It is
 TaskConfig.n_moves, named here so a reader can pick one arm out of a sweep without building a config"""
 
+BASE_AGENTS = 1
+"""Balloons in every arm but the fleet arm"""
+
 BASE_DIRECTION = "downwind"
 """Where the goal sits relative to the flow, for every arm but the scouting one. The scouting arm kept it:
 crosswind, upwind and random were unreachable at every distance it tried, even 300 km"""
@@ -57,7 +60,8 @@ class Cell(NamedTuple):
     belief_scale: float  # what the belief assumes the error is, as a multiple of sigma; 1 is calibrated
     nested: bool  # whether the draws are a subset of one shared pool rather than drawn fresh
     n_moves: int  # length of the episode, in three-hour moves
-    objective: str  # "reach" the goal, or "escape" as far from the start as the wind allows
+    objective: str  # "reach" the goal, "escape" as far from the start as the wind allows, "station" or "targets"
+    n_agents: int = 1  # balloons flown together; above 1, or a station or targets objective, it is a fleet cell
 
 
 def _ladder(experiment: ExperimentConfig, fitted_sigma: float) -> list[float]:
@@ -211,10 +215,54 @@ def escape_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) 
     return out
 
 
-ARMS = {"scout": scout_arm, "main": main_arm, "distance": distance_arm, "calibration": calibration_arm, "nested": nested_arm, "length": length_arm, "escape": escape_arm}
+def _objective_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float, objective: str, n_agents: int) -> list[Cell]:
+    """One objective at one fleet size over the noise ladder: hindsight, the fixed plan, MPC and MPC not
+    learning, on the belief's mean at one horizon, the shape of the escape arm"""
+    out: list[Cell] = []
+    horizon = experiment.new_objective_horizon
+    for seed in experiment.seeds:
+        out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, n_moves, 0, BASE_GOAL_KM, 1.0, False, n_moves, objective, n_agents))
+        for sigma in _ladder(experiment, fitted_sigma):
+            out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, n_moves, 0, BASE_GOAL_KM, 1.0, False, n_moves, objective, n_agents))
+            out.extend(
+                Cell(which, seed, BASE_DIRECTION, sigma, horizon, 0, BASE_GOAL_KM, 1.0, False, n_moves, objective, n_agents)
+                for which in ("mpc", "mpc_blind")
+            )
+    return out
 
 
-SWEEP = ("main", "distance", "calibration", "nested", "length", "escape")
+def station_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> list[Cell]:
+    """Hold a point (decision 47): one balloon launched on the station, scored on how far outside the
+    arrival radius it is, summed over the moves. The Loon task, and the one the altitude-only vehicle is
+    least suited to, since staying put needs levels that oppose each other"""
+    return _objective_arm(experiment, n_moves, fitted_sigma, "station", 1)
+
+
+def targets_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> list[Cell]:
+    """Visit several stops (decision 47): the base task's goal distance broken into a downwind chain of
+    task.n_targets stops, visited in any order. Each stop is scored until it is visited"""
+    return _objective_arm(experiment, n_moves, fitted_sigma, "targets", 1)
+
+
+def fleet_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> list[Cell]:
+    """Every objective, old and new, flown by a fleet sharing one belief (decision 48).
+
+    Each seed's fleet launches round the same start as that seed's single balloon and flies the same weather,
+    so a fleet cell is paired with the single-balloon cell of its seed. The question the arm is for is what
+    sharing readings is worth: MPC minus MPC not learning here, against the same difference for one balloon,
+    which on the reach task was zero (2026-10-24)"""
+    out: list[Cell] = []
+    for n_agents in experiment.fleet_sizes:
+        for objective in ("reach", "escape", "station", "targets"):
+            out.extend(_objective_arm(experiment, n_moves, fitted_sigma, objective, n_agents))
+    return out
+
+
+ARMS = {"scout": scout_arm, "main": main_arm, "distance": distance_arm, "calibration": calibration_arm, "nested": nested_arm, "length": length_arm, "escape": escape_arm,
+        "station": station_arm, "targets": targets_arm, "fleet": fleet_arm}
+
+
+SWEEP = ("main", "distance", "calibration", "nested", "length", "escape", "station", "targets", "fleet")
 """The sweep proper: everything except the scouting arm, which is run first and on its own"""
 
 

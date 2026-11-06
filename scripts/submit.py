@@ -56,7 +56,7 @@ def flags(cell, pool: int, keep_path: bool) -> str:
     out = (f"--controller {cell.controller} --seed {cell.seed} --sigma {cell.sigma} "
            f"--horizon {cell.horizon} --n-winds {cell.n_winds} --goal-km {cell.goal_km} "
            f"--direction {cell.direction} --belief-scale {cell.belief_scale} "
-           f"--n-moves {cell.n_moves} --objective {cell.objective}")
+           f"--n-moves {cell.n_moves} --objective {cell.objective} --n-agents {cell.n_agents}")
     if cell.nested:
         out += f" --nested --nested-pool {pool}"
     if keep_path:
@@ -75,7 +75,7 @@ def cost_guess(cell, pool: int) -> float:
     """
     replans = cell.controller in ("mpc", "mpc_blind", "hindsight")
     solves = cell.n_moves if replans else 1
-    return solves * cell.horizon * (1 + drawn(cell, pool))
+    return solves * cell.horizon * (1 + drawn(cell, pool)) * cell.n_agents  # a fleet rolls out every balloon
 
 
 def drawn(cell, pool: int) -> int:

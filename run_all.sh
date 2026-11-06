@@ -11,7 +11,10 @@ set -euo pipefail
 RECORD=${RECORD:-records/era5_global_jul2021.npz}
 PYTHON=${PYTHON:-uv run python}
 OUT=${OUT:-results/rows-$(date +%F)}
-ARMS=${ARMS:-main,distance,calibration,nested,length,escape}
+ARMS=${ARMS:-station,targets,fleet}
+# The 2026-11-05 default is the three new arms only: everything else ran on 2026-10-30 and is in
+# results/rows-2026-10-30.jsonl. ARMS=main,distance,calibration,nested,length,escape,station,targets,fleet
+# runs the whole sweep again.
 #
 # The scouting arm comes first and runs on its own, since it is what decides the task the sweep flies:
 #     ARMS=scout OUT=results/rows-scout ./run_all.sh
@@ -64,6 +67,18 @@ uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --
   --goal-km "$GOAL_KM" --direction "$DIRECTION" --n-moves "$LONG" --out results/smoke.jsonl
 uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 0 \
   --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective escape --out results/smoke.jsonl
+say "   and the new objectives, alone and as a fleet"
+FLEET=$(uv run python -c "from balloon_sim.config import ExperimentConfig; print(max(ExperimentConfig().fleet_sizes))")
+for OBJECTIVE in station targets; do
+  uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 0 \
+    --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective "$OBJECTIVE" --keep-path --out results/smoke.jsonl
+done
+for OBJECTIVE in reach escape station targets; do
+  uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 0 \
+    --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective "$OBJECTIVE" --n-agents "$FLEET" --keep-path --out results/smoke.jsonl
+done
+uv run scripts/run_cell.py --controller hindsight --seed 0 --sigma 0 --horizon 50 --n-winds 0 \
+  --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective targets --n-agents "$FLEET" --keep-path --out results/smoke.jsonl
 
 say "6. the grid"
 uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --dry-run
@@ -72,17 +87,45 @@ say "7. submit?"
 read -r -p "   type yes to send it to Slurm: " ANSWER
 [ "$ANSWER" = "yes" ] || { echo "   nothing submitted"; exit 0; }
 
-uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --keep-path
+SUBMITTED=$(uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --keep-path | tee /dev/stderr)
+JOBS=$(grep -o 'Submitted batch job [0-9]*' <<< "$SUBMITTED" | awk '{print $4}' | paste -sd: -)
+[ -n "$JOBS" ] || { echo "   no job ids came back from sbatch; run the analysis by hand (below)"; exit 1; }
 
-cat <<'NOTE'
+say "8. the analysis, queued to start when every array has finished"
+# afterany, not afterok: a cell that fails loses one row, and the analysis should still run on the rest.
+# It joins the per-cell rows into one file, summarises and plots every arm, and draws the flight maps.
+STAMP=${OUT##*rows-}
+mkdir -p results/logs
+cat > "results/analyse-$STAMP.sh" <<JOB
+#!/bin/bash
+#SBATCH --job-name=balloon-analyse
+#SBATCH --partition=${PARTITION:-dean}
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=16G
+#SBATCH --time=180
+#SBATCH --dependency=afterany:$JOBS
+#SBATCH --output=$PWD/results/logs/analyse-$STAMP.out
+set -uo pipefail
+export PATH=\$HOME/.local/bin:\$PATH
+cd $PWD
+cat $OUT/*.jsonl > $OUT.jsonl
+echo "\$(wc -l < $OUT.jsonl) rows of \$(wc -l < results/cells.txt) cells"
+./analyse_all.sh $OUT.jsonl $STAMP
+JOB
+sbatch "results/analyse-$STAMP.sh"
 
-Submitted. To watch it:
-    squeue -u "$USER"
-    sacct -X --format=JobID,State,Elapsed --starttime today | tail -20
+cat <<NOTE
 
-When it is done, one command summarises and plots every arm, and nothing is left to plot by hand:
-    STAMP=$(date +%F)
-    cat results/rows-$STAMP/*.jsonl > results/rows-$STAMP.jsonl
-    ./analyse_all.sh results/rows-$STAMP.jsonl $STAMP
-    git add -f results/summary-$STAMP-*.txt figures/$STAMP* && git commit && git push
+Submitted. Nothing else needs running: the analysis job waits for the sweep, then writes
+    results/summary-$STAMP-*.txt     one per arm
+    figures/$STAMP-*/                one folder per arm
+    figures/$STAMP-maps/             flight maps for every new arm
+    results/logs/analyse-$STAMP.out  what it printed
+
+To watch it:
+    squeue -u "\$USER"
+    tail -f results/logs/analyse-$STAMP.out
+
+When the analysis job is gone from squeue, commit what it made:
+    git add -f $OUT.jsonl results/summary-$STAMP-*.txt figures/$STAMP* && git commit -m "The $STAMP sweep" && git push
 NOTE

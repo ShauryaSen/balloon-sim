@@ -21,6 +21,9 @@ from balloon_sim.cells import BASE_GOAL_KM, BASE_MOVES
 from balloon_sim.results import best_hindsight, one_arm, read_rows
 
 
+NAMES = {"fixed_plan": "fixed plan", "mpc": "MPC", "mpc_blind": "MPC not learning"}
+
+
 def keyed(rows: list[dict]) -> dict:
     """{(controller, horizon or None, n_winds, sigma): {seed: row}}
 
@@ -65,18 +68,22 @@ def arm(ask: argparse.ArgumentParser) -> None:
     ask.add_argument("--belief-scale", type=float, default=1.0, help="what the belief assumed the error was, as a multiple")
     ask.add_argument("--nested", action="store_true", help="read the nested-draw arm instead of the fresh-draw one")
     ask.add_argument("--n-moves", type=int, default=None, help=f"episode length (default {BASE_MOVES:g}; the length arm is longer)")
-    ask.add_argument("--objective", choices=("reach", "escape"), default="reach", help="which objective the arm flew")
+    ask.add_argument("--objective", choices=("reach", "escape", "station", "targets"), default="reach", help="which objective the arm flew")
+    ask.add_argument("--n-agents", type=int, default=1, help="balloons in the fleet (default 1; the fleet arm is larger)")
 
 
 def main(argv: list[str] | None = None) -> None:
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ask.add_argument("rows", nargs="+")
     arm(ask)
+    ask.add_argument("--metric", default="summed_km",
+                     help="what the paired comparisons are on. summed_km, the default, is what every summary so far "
+                          "used; cost_km is the objective itself, and is what an arm other than reach should use")
     asked = ask.parse_args(argv)
-    chosen = one_arm(read_rows(asked.rows), asked.goal_km, asked.belief_scale, asked.nested, asked.n_moves, asked.objective)
+    chosen = one_arm(read_rows(asked.rows), asked.goal_km, asked.belief_scale, asked.nested, asked.n_moves, asked.objective, asked.n_agents)
     if not chosen:
         sys.exit("no rows in that arm; --goal-km, --n-moves, --objective, --belief-scale and --nested pick one")
-    print(f"# arm: {asked.objective}, goal {asked.goal_km or BASE_GOAL_KM:g} km, "
+    print(f"# arm: {asked.objective}, {asked.n_agents} balloon(s), goal {asked.goal_km or BASE_GOAL_KM:g} km, "
           f"{asked.n_moves or BASE_MOVES:g} moves, belief scale {asked.belief_scale:g}, "
           f"draws {'nested' if asked.nested else 'fresh'}")
     rows = best_hindsight(chosen)  # hindsight: the best search found on the true wind
@@ -104,8 +111,31 @@ def main(argv: list[str] | None = None) -> None:
               + (f"; median move {st.median(r['arrived_move'] for r in reached):.0f}" if reached else ""))
     print()
 
+    # how often the task itself was done, for the objectives that have a success count: the raw mean per
+    # controller, not relative to hindsight, since these are counts and fractions rather than costs
+    success = {"arrived_count": "balloons that arrived", "visited_count": "targets visited",
+               "covered_fraction": "fraction of moves the station was held",
+               "arrived": "task complete (reach: every balloon arrived; targets: every one visited; station: held every move)"}
+    own = {"reach": "arrived_count", "targets": "visited_count", "station": "covered_fraction"}.get(asked.objective)
+    shown = [m for m in (own, "arrived") if m and all(m in r for r in rows)] if all("n_agents" in r for r in rows) else []
+    for m in shown:
+        print(f"## {success[m]}, mean over seeds (higher is better)\n")
+        print("| controller | " + " | ".join(f"σ={s:g}" for s in sigmas) + " |")
+        print("|---|" + "---|" * len(sigmas))
+        for name, key in [("hindsight", ("hindsight", None, 0))] + [
+                (f"{NAMES[c]}", (c, h, n)) for (c, h, n) in sorted({k[:3] for k in by if k[0] != "hindsight"}, key=str)]:
+            cells = []
+            for s in sigmas:
+                line = by.get(key + (0.0 if key[0] == "hindsight" else s,), {})
+                cells.append(f"{st.mean(float(r[m]) for r in line.values()):.2f}" if line else "-")
+            print(f"| {name} | " + " | ".join(cells) + " |")
+        print()
+
     for metric in [m for m in ("cost_km", "summed_km", "final_km") if m in present]:
-        what = {"cost_km": "the objective (distance summed until arrival)",
+        what = {"cost_km": {"reach": "the objective (distance summed until arrival)",
+                            "escape": "the objective (minus distance from the start, summed)",
+                            "station": "the objective (km outside the station's circle, summed)",
+                            "targets": "the objective (distance to each unvisited target, summed)"}[asked.objective],
                 "summed_km": "distance to the goal, summed over the moves",
                 "final_km": "final distance"}[metric]
         print(f"## {what}, km above hindsight, paired mean over seeds\n")
@@ -124,8 +154,8 @@ def main(argv: list[str] | None = None) -> None:
             print(f"| {name} | " + " | ".join(cells) + " |")
         print()
 
-    metric = "summed_km"
-    print("## paired comparisons, distance to the goal summed over the moves\n")
+    metric = asked.metric
+    print(f"## paired comparisons, on {metric}\n")
     print("horizon: each horizon minus the next longer one, MPC on the mean")
     for s in sigmas:
         for short, long in zip(horizons, horizons[1:]):
