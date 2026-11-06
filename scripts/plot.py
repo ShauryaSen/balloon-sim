@@ -238,7 +238,9 @@ def draw_score(lines: dict, sigmas: list[float], metric: str, into: Path, title:
                 if seed not in floor.get(sigma, {}) or seed not in hind_by_seed:
                     continue
                 gap = floor[sigma][seed][metric] - hind_by_seed[seed][metric]
-                if gap > 0.05 * hind_by_seed[seed][metric]:  # a gap worth dividing by
+                # a gap worth dividing by: 5% of hindsight's size, not of its value, since an escape cost
+                # is negative and 5% of it let a zero gap through to divide by
+                if gap > 0.05 * abs(hind_by_seed[seed][metric]):
                     scores.append((floor[sigma][seed][metric] - mpc_row[metric]) / gap)
             values = np.array(scores, dtype=float)
             q = np.percentile(values, [25, 50, 75]) if values.size >= 4 else np.array([np.nan] * 3)

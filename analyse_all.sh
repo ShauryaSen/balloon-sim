@@ -54,8 +54,7 @@ for ARM in "${ARMS[@]}"; do
     continue
   fi
   head -2 "results/summary-$STAMP-$NAME.txt"
-  # a figure that fails is reported and the rest go on: the escape arm's score figure is known to divide
-  # by zero (a guard written for positive costs), and that must not stop every arm after it
+  # a figure that fails is reported and the rest go on, so one arm cannot stop every arm after it
   if ! $RUN scripts/plot.py "$ROWS" $FLAGS --into "$INTO" > "results/plot-$STAMP-$NAME.log" 2>&1; then
     echo "   plot.py failed on this arm; the figures before the failure were written. See results/plot-$STAMP-$NAME.log"
   else
