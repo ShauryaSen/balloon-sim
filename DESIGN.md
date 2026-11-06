@@ -221,6 +221,13 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     modules are left as they are and the fleet is its own module. The fleet arm flies all four objectives at
     `fleet_sizes` (4); its question is what shared readings are worth, read as MPC minus MPC not learning.
 
+49. **The fidelity-to-transfer experiment** (`docs/fidelity-design-2026-11-06.md`, locked 2026-11-06). Simulators
+    are the true wind degraded one property at a time: vertical levels, frame interval, horizontal grid,
+    amplitude of variability, and error structure at equal size. MPC plans in each and flies in the truth. The
+    truth is rebuilt at 18 ERA5 model levels, because a 6-level truth cannot show what finer vertical structure
+    is worth, and the task is re-scouted on it. One pre-registered primary test: whether control loss tracks the
+    error in the wind or the error in the differences between levels.
+
 ## Open
 
 - The normalised score near sigma = 0, where the gap it divides by is close to zero.

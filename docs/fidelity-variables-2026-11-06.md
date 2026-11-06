@@ -1,4 +1,4 @@
-# What to vary in the fidelity-to-transfer experiment
+# What to vary in the fidelity-to-transfer experiment (draft, superseded by fidelity-design-2026-11-06.md)
 
 For the meeting of 2026-11-06. Sarah asked for a short list of simulator properties to vary, each with a reason
 to care and a hypothesis, chosen so the experiment gives a paper whatever it finds.
