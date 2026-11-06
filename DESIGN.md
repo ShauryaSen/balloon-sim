@@ -227,6 +227,18 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     truth is rebuilt at 18 ERA5 model levels, because a 6-level truth cannot show what finer vertical structure
     is worth, and the task is re-scouted on it. One pre-registered primary test: whether control loss tracks the
     error in the wind or the error in the differences between levels.
+50. **A learned controller: PPO with one policy shared by every balloon** (`balloon_sim/rl.py`). Each
+    balloon runs the same network on its own observation; one team reward, minus the objective's cost per
+    move, so an episode's return is exactly minus its `cost_km`. This is MAPPO with parameter sharing (Yu et
+    al. 2022); N = 1 is plain PPO. It sees the sweep's own belief, the GP conditioned on every reading the
+    fleet has taken, at every level at its position; `rl_blind` never uses a reading, as mpc_blind. The
+    forecast is read at a point from the error's Fourier features, blended exactly as wind_at blends the
+    grid, so it equals forecast() without building a grid per episode (`tests/test_rl.py`). Sixteen
+    policies: four objectives, alone and at the fleet size, learning and blind. Each is trained on 256
+    tasks from seeds 100,000 and up, with sigma drawn from the ladder every episode and given to it, then
+    flown on the sweep's 32 seeds at every sigma through `fleet.fly`, paired with every other controller of
+    the seed. Settings are PPO's usual (`RLConfig`), not tuned: its training curve is written beside it and
+    drawn by `scripts/plot_rl.py`, and is to be read before its ranking.
 
 ## Open
 

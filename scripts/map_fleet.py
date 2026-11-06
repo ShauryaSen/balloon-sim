@@ -25,7 +25,7 @@ from balloon_sim.results import one_arm, read_rows
 
 INK = "#12161b"
 SHADES = ("#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00", "#56b4e9", "#f0e442", "#999999")
-NAMES = {"hindsight": "hindsight", "mpc": "MPC", "mpc_blind": "MPC not learning", "fixed_plan": "fixed plan"}
+NAMES = {"hindsight": "hindsight", "mpc": "MPC", "mpc_blind": "MPC not learning", "fixed_plan": "fixed plan", "rl": "RL (PPO)", "rl_blind": "RL not learning"}
 DONE = {
     "reach": lambda r: f"{r['arrived_count']}/{r['n_agents']} arrived",
     "escape": lambda r: f"farthest {r['farthest_km']:,.0f} km",
@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> None:
     ask.add_argument("--sigma", type=float, default=3.2)
     ask.add_argument("--horizon", type=int, default=20)
     ask.add_argument("--n-moves", type=int, default=None, help="episode length, if not the base 50")
-    ask.add_argument("--controllers", default="hindsight,mpc,mpc_blind,fixed_plan")
+    ask.add_argument("--controllers", default="hindsight,mpc,mpc_blind,fixed_plan,rl,rl_blind")
     ask.add_argument("--into", default="figures")
     asked = ask.parse_args(argv)
 

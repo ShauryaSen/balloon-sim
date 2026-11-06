@@ -21,7 +21,9 @@ from balloon_sim.cells import BASE_GOAL_KM, BASE_MOVES
 from balloon_sim.results import best_hindsight, one_arm, read_rows
 
 
-NAMES = {"fixed_plan": "fixed plan", "mpc": "MPC", "mpc_blind": "MPC not learning"}
+NAMES = {"fixed_plan": "fixed plan", "mpc": "MPC", "mpc_blind": "MPC not learning", "rl": "RL (PPO)", "rl_blind": "RL not learning"}
+LEARNED = ("rl", "rl_blind")
+"""The learned controllers (balloon_sim/rl.py): no horizon and no draws, one policy per objective and fleet"""
 
 
 def keyed(rows: list[dict]) -> dict:
@@ -145,6 +147,7 @@ def main(argv: list[str] | None = None) -> None:
         lines += [(f"MPC, horizon {h}, {n} draws", ("mpc", h, n)) for h in horizons for n in mpc_draws]
         # the same controller without its readings: replanning on the forecast alone
         lines += [(f"MPC not learning, horizon {h}, mean", ("mpc_blind", h, 0)) for h in blind_horizons]
+        lines += [(NAMES[c], (c, None, 0)) for c in LEARNED if any(k[0] == c for k in by)]
         for name, (c, h, n) in lines:
             cells = []
             for s in sigmas:
@@ -183,6 +186,18 @@ def main(argv: list[str] | None = None) -> None:
             for h in blind_horizons:
                 if ("mpc_blind", h, 0, s) in by and ("fixed_plan", None, fixed_draws[0], s) in by:
                     print(f"  sigma {s:5g}  H{h:<2d}: {compare(by[('mpc_blind', h, 0, s)], by[('fixed_plan', None, fixed_draws[0], s)], metric)}")
+
+    if any(k[0] == "rl" for k in by):
+        print("\nthe learned controller: RL minus MPC on the mean (each horizon), and RL minus RL not learning")
+        print("  below zero, the policy did better; RL minus RL not learning is what its readings were worth")
+        for s in sigmas:
+            for h in horizons:
+                if ("rl", None, 0, s) in by and ("mpc", h, 0, s) in by:
+                    print(f"  sigma {s:5g}  RL - MPC H{h:<2d}: {compare(by[('rl', None, 0, s)], by[('mpc', h, 0, s)], metric)}")
+            if ("rl", None, 0, s) in by and ("rl_blind", None, 0, s) in by:
+                print(f"  sigma {s:5g}  RL - RL not learning: {compare(by[('rl', None, 0, s)], by[('rl_blind', None, 0, s)], metric)}")
+            if ("rl", None, 0, s) in by and ("fixed_plan", None, 0, s) in by:
+                print(f"  sigma {s:5g}  RL - fixed plan: {compare(by[('rl', None, 0, s)], by[('fixed_plan', None, 0, s)], metric)}")
 
     if len(fixed_draws) > 1:
         print(f"\ndraws: the fixed plan with {fixed_draws[-1]} draws minus the fixed plan with {fixed_draws[0]}")

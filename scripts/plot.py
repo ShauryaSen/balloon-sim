@@ -70,8 +70,11 @@ SHORT = {
 running off the right edge of the score figures"""
 
 INK, COLOURS = "#12161b", ("#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00")
-STYLE = {"hindsight": "-", "mpc": "-", "mpc_blind": ":", "fixed_plan": "--"}
-MARKER = {"hindsight": "o", "mpc": "o", "mpc_blind": "^", "fixed_plan": "o"}
+STYLE = {"hindsight": "-", "mpc": "-", "mpc_blind": ":", "fixed_plan": "--", "rl": "-", "rl_blind": ":"}
+MARKER = {"hindsight": "o", "mpc": "o", "mpc_blind": "^", "fixed_plan": "o", "rl": "s", "rl_blind": "s"}
+LEARNED_COLOUR = "#7b3294"
+"""The learned controllers (balloon_sim/rl.py) in their own colour, solid when learning from readings and
+dotted when not, as MPC is, and square on the dots figure"""
 """A line's style tells the controllers apart where they share a colour, and there are no lines on the dots
 figure to carry it, so the shape does the same job there: MPC a circle, MPC that does not learn a triangle"""
 """A line per controller: solid replans and learns, dotted replans without learning, dashed commits once.
@@ -83,16 +86,20 @@ MPC solid, the fixed plan dashed, so the same draw count can be compared across 
 def colour(controller: str, n_winds: int) -> str:
     if controller == "hindsight":
         return INK
+    if controller in ("rl", "rl_blind"):
+        return LEARNED_COLOUR
     return COLOURS[{0: 0, 1: 1, 4: 2, 16: 3, 64: 4}.get(n_winds, 0)]
 
 
-NAMES = {"fixed_plan": "fixed plan", "mpc": "MPC", "mpc_blind": "MPC not learning"}
+NAMES = {"fixed_plan": "fixed plan", "mpc": "MPC", "mpc_blind": "MPC not learning", "rl": "RL (PPO)", "rl_blind": "RL not learning"}
 
 
 def label(controller: str, n_winds: int) -> str:
     """What a line is called: hindsight reads the truth, so its draws mean nothing"""
     if controller == "hindsight":
         return "hindsight (best search on the true wind)"
+    if controller in ("rl", "rl_blind"):
+        return NAMES[controller]  # a policy: no draws to name
     drawn = "mean" if n_winds == 0 else f"{n_winds} draws"
     return f"{NAMES.get(controller, controller)}, {drawn}"
 

@@ -12,6 +12,10 @@ RECORD=${RECORD:-records/era5_global_jul2021.npz}
 PYTHON=${PYTHON:-uv run python}
 OUT=${OUT:-results/rows-$(date +%F)}
 ARMS=${ARMS:-station,targets,fleet}
+RL=${RL:-yes}  # also train and evaluate the learned policies (balloon_sim/rl.py); RL=no skips them
+EARLIER=${EARLIER:-results/rows-2026-10-24.jsonl results/rows-2026-10-30.jsonl}
+# rows of earlier sweeps the analysis reads beside this one: the single-balloon reach (main) and escape arms
+# the learned policies are compared against are there, and are not flown again
 # The 2026-11-05 default is the three new arms only: everything else ran on 2026-10-30 and is in
 # results/rows-2026-10-30.jsonl. ARMS=main,distance,calibration,nested,length,escape,station,targets,fleet
 # runs the whole sweep again.
@@ -80,8 +84,21 @@ done
 uv run scripts/run_cell.py --controller hindsight --seed 0 --sigma 0 --horizon 50 --n-winds 0 \
   --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective targets --n-agents "$FLEET" --keep-path --out results/smoke.jsonl
 
+if [ "$RL" = "yes" ]; then
+  say "   and a learned policy: two iterations on this record, then flown on one seed, to see it run end to end"
+  uv run scripts/train_rl.py --objective targets --n-agents "$FLEET" --rl.iterations 2 --rl.envs 4 \
+    --rl.train_seeds 4 --rl.minibatches 2 --record "$RECORD" --out results/smoke-policies
+  uv run scripts/eval_rl.py "results/smoke-policies/targets-n$FLEET-learns.pkl" --seeds 0 --sigmas 3.2 \
+    --out results/smoke-rl.jsonl
+fi
+
 say "6. the grid"
 uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --dry-run
+if [ "$RL" = "yes" ]; then
+  N_POLICIES=$(uv run python -c "from balloon_sim import rl; from balloon_sim.config import ExperimentConfig; print(len(rl.policies(ExperimentConfig())))")
+  echo "   and $N_POLICIES learned policies, each trained, then flown on every seed and noise level:"
+  uv run python -c "from balloon_sim import rl; from balloon_sim.config import ExperimentConfig; [print('     ', i, rl.policy_name(*p)) for i, p in enumerate(rl.policies(ExperimentConfig()))]"
+fi
 
 say "7. submit?"
 read -r -p "   type yes to send it to Slurm: " ANSWER
@@ -89,37 +106,80 @@ read -r -p "   type yes to send it to Slurm: " ANSWER
 
 SUBMITTED=$(uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --keep-path | tee /dev/stderr)
 JOBS=$(grep -o 'Submitted batch job [0-9]*' <<< "$SUBMITTED" | awk '{print $4}' | paste -sd: -)
-[ -n "$JOBS" ] || { echo "   no job ids came back from sbatch; run the analysis by hand (below)"; exit 1; }
-
-say "8. the analysis, queued to start when every array has finished"
-# afterany, not afterok: a cell that fails loses one row, and the analysis should still run on the rest.
-# It joins the per-cell rows into one file, summarises and plots every arm, and draws the flight maps.
+[ -n "$JOBS" ] || { echo "   no job ids came back from sbatch"; exit 1; }
 STAMP=${OUT##*rows-}
-mkdir -p results/logs
+mkdir -p results/logs policies "$OUT"
+
+if [ "$RL" = "yes" ]; then
+  say "   the learned policies: one training job each, then one evaluation job each once its training is done"
+  # aftercorr: evaluation task i starts when training task i has finished, whatever the others are doing
+  cat > "results/rl-train-$STAMP.sh" <<JOB
+#!/bin/bash
+#SBATCH --job-name=balloon-rl-train
+#SBATCH --partition=${PARTITION:-dean}
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=720
+#SBATCH --array=0-$((N_POLICIES - 1))
+#SBATCH --output=$PWD/results/logs/rl-train-$STAMP-%a.out
+set -euo pipefail
+export PATH=\$HOME/.local/bin:\$PATH
+cd $PWD
+uv run scripts/train_rl.py --index \$SLURM_ARRAY_TASK_ID --record $RECORD --out policies
+JOB
+  TRAIN=$(sbatch --parsable "results/rl-train-$STAMP.sh")
+  echo "   training: job $TRAIN"
+  cat > "results/rl-eval-$STAMP.sh" <<JOB
+#!/bin/bash
+#SBATCH --job-name=balloon-rl-eval
+#SBATCH --partition=${PARTITION:-dean}
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=16G
+#SBATCH --time=240
+#SBATCH --array=0-$((N_POLICIES - 1))
+#SBATCH --dependency=aftercorr:$TRAIN
+#SBATCH --output=$PWD/results/logs/rl-eval-$STAMP-%a.out
+set -euo pipefail
+export PATH=\$HOME/.local/bin:\$PATH
+cd $PWD
+uv run scripts/eval_rl.py --index \$SLURM_ARRAY_TASK_ID --policies policies --out-dir $OUT
+JOB
+  EVAL=$(sbatch --parsable "results/rl-eval-$STAMP.sh")
+  echo "   evaluation: job $EVAL, each task waiting on its own policy"
+  JOBS="$JOBS:$TRAIN:$EVAL"
+fi
+
+say "8. the analysis, queued to start when everything above has finished"
+# afterany, not afterok: a cell that fails loses one row, and the analysis should still run on the rest.
+# It joins this sweep's rows into one file (the one to commit), adds the earlier sweeps' rows beside them in
+# a second file for reading, summarises and plots every arm, draws the flight maps and the training curves.
 cat > "results/analyse-$STAMP.sh" <<JOB
 #!/bin/bash
 #SBATCH --job-name=balloon-analyse
 #SBATCH --partition=${PARTITION:-dean}
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=16G
-#SBATCH --time=180
+#SBATCH --time=240
 #SBATCH --dependency=afterany:$JOBS
 #SBATCH --output=$PWD/results/logs/analyse-$STAMP.out
 set -uo pipefail
 export PATH=\$HOME/.local/bin:\$PATH
 cd $PWD
 cat $OUT/*.jsonl > $OUT.jsonl
-echo "\$(wc -l < $OUT.jsonl) rows of \$(wc -l < results/cells.txt) cells"
-./analyse_all.sh $OUT.jsonl $STAMP
+echo "\$(wc -l < $OUT.jsonl) rows: \$(wc -l < results/cells.txt) sweep cells, and the learned policies' flights"
+cat $EARLIER $OUT.jsonl > results/rows-$STAMP-with-earlier.jsonl
+./analyse_all.sh results/rows-$STAMP-with-earlier.jsonl $STAMP
+if [ "$RL" = "yes" ]; then uv run scripts/plot_rl.py policies --into figures/$STAMP-rl; fi
 JOB
 sbatch "results/analyse-$STAMP.sh"
 
 cat <<NOTE
 
-Submitted. Nothing else needs running: the analysis job waits for the sweep, then writes
-    results/summary-$STAMP-*.txt     one per arm
+Submitted. Nothing else needs running: the analysis job waits for all of it, then writes
+    results/summary-$STAMP-*.txt     one per arm (RL rows are in the arms they flew)
     figures/$STAMP-*/                one folder per arm
     figures/$STAMP-maps/             flight maps for every new arm
+    figures/$STAMP-rl/               the policies' training curves: look at these first
     results/logs/analyse-$STAMP.out  what it printed
 
 To watch it:
@@ -127,5 +187,5 @@ To watch it:
     tail -f results/logs/analyse-$STAMP.out
 
 When the analysis job is gone from squeue, commit what it made:
-    git add -f $OUT.jsonl results/summary-$STAMP-*.txt figures/$STAMP* && git commit -m "The $STAMP sweep" && git push
+    git add -f $OUT.jsonl policies results/summary-$STAMP-*.txt figures/$STAMP* && git commit -m "The $STAMP sweep" && git push
 NOTE

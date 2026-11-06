@@ -164,3 +164,27 @@ class ExperimentConfig:
     """The MPC horizon the station, targets and fleet arms hold fixed, as the escape arm does"""
 
     controllers: tuple[str, ...] = ("hindsight", "fixed_plan", "mpc")
+
+
+@dataclass(frozen=True)
+class RLConfig:
+    """The learned controller's training (balloon_sim/rl.py, decision 50). PPO's usual settings (Schulman et
+    al. 2017; the cooperative multi-agent defaults of Yu et al. 2022), not tuned here: check the training
+    curve each policy writes before reading anything into its ranking"""
+
+    hidden: int = 64  # units in each of the two hidden layers, policy and value alike
+    iterations: int = 2000  # PPO iterations, each collecting `envs` episodes: 64,000 episodes, past where the 2026-11-05 synthetic checks plateaued
+    envs: int = 32  # episodes per iteration, flown in parallel
+    epochs: int = 4  # passes over each iteration's data
+    minibatches: int = 4
+    learning_rate: float = 3e-4
+    gamma: float = 0.99
+    gae_lambda: float = 0.95
+    clip: float = 0.2
+    value_coef: float = 0.5
+    entropy_coef: float = 1e-3
+    max_grad_norm: float = 0.5
+    init_log_std: float = -0.5  # the policy's starting spread, in the pre-squash action
+    reward_km: float = 1000.0  # the reward is minus the move's cost in these units
+    train_seeds: int = 256  # tasks training draws from
+    seed_offset: int = 100_000  # training seeds start here, far from the sweep's 0 to 31
