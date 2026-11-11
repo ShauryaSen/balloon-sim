@@ -1,0 +1,13 @@
+{
+  "name": "balloon-sim-talk",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "slidev --open",
+    "export": "slidev export --output talk.pdf"
+  },
+  "dependencies": {
+    "@slidev/cli": "^52.0.0",
+    "@slidev/theme-default": "^0.25.0"
+  }
+}
