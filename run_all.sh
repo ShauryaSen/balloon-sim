@@ -12,6 +12,7 @@ RECORD=${RECORD:-records/era5_global_jul2021.npz}
 PYTHON=${PYTHON:-uv run python}
 OUT=${OUT:-results/rows-$(date +%F)}
 ARMS=${ARMS:-station,targets,fleet}
+MINUTES=${MINUTES:-120}  # the time limit of each sweep cell; the flight arm needs more (MINUTES=480)
 RL=${RL:-yes}  # also train and evaluate the learned policies (balloon_sim/rl.py); RL=no skips them
 EARLIER=${EARLIER:-results/rows-2026-10-24.jsonl results/rows-2026-10-30.jsonl}
 # rows of earlier sweeps the analysis reads beside this one: the single-balloon reach (main) and escape arms
@@ -24,6 +25,12 @@ EARLIER=${EARLIER:-results/rows-2026-10-24.jsonl results/rows-2026-10-30.jsonl}
 #     ARMS=scout OUT=results/rows-scout ./run_all.sh
 #     uv run scripts/scout.py results/rows-scout/*.jsonl
 # then set BASE_DIRECTION and BASE_GOAL_KM in balloon_sim/cells.py to what it chose and run this again.
+#
+# The greedy arm (MPC with a one-move horizon, decision 51) flies the July record beside the 2026-11-05 rows:
+#     ARMS=greedy RL=no EARLIER="results/rows-2026-10-24.jsonl results/rows-2026-10-30.jsonl results/rows-2026-11-05.jsonl" ./run_all.sh
+# The flight arm (long flights and long horizons, decision 51) needs a record at least 1,500 h long, flown alone:
+#     ARMS=flight RL=no MINUTES=480 RECORD=records/<the long record>.npz EARLIER="" ./run_all.sh
+# Every cell flies $RECORD: it is passed to each one, not only checked here.
 
 say() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 
@@ -42,47 +49,62 @@ GOAL=$(uv run python -c "from balloon_sim.cells import BASE_GOAL_KM, BASE_DIRECT
 read -r GOAL_KM DIRECTION <<< "$GOAL"
 
 say "4. does the record cover the longest episode?"
-$PYTHON - "$RECORD" <<'CHECK'
+$PYTHON - "$RECORD" "$ARMS" <<'CHECK'
 import sys
 import numpy as np
 from balloon_sim.config import BalloonConfig, ExperimentConfig
 
 record = np.load(sys.argv[1])
 covered = float(record["hours"][-1] - record["hours"][0])
-needed = max(ExperimentConfig().episode_lengths) * BalloonConfig().step_hours
+lengths = ExperimentConfig().flight_lengths if "flight" in sys.argv[2].split(",") else ExperimentConfig().episode_lengths
+needed = max(lengths) * BalloonConfig().step_hours
 print(f"   record covers {covered:.0f} h; the longest episode needs {needed:.0f} h")
 if needed > covered:
-    sys.exit(f"   the length arm would fly past the end of the record, where the wind is held at the last\n"
-             f"   frame. Lower max(ExperimentConfig.episode_lengths) to {int(covered // BalloonConfig().step_hours)} or fewer moves.")
+    sys.exit(f"   the longest flight would fly past the end of the record, where the wind is held at the last\n"
+             f"   frame. Use a longer record, or lower the longest length to {int(covered // BalloonConfig().step_hours)} or fewer moves.")
 CHECK
 
 say "5. one cell of each controller at ${GOAL_KM} km ${DIRECTION}, to see one fly before the whole sweep does"
 for CONTROLLER in hindsight fixed_plan mpc mpc_blind; do
   uv run scripts/run_cell.py --controller "$CONTROLLER" --seed 0 --sigma 3.2 --horizon 20 \
-    --n-winds 0 --goal-km "$GOAL_KM" --direction "$DIRECTION" --keep-path --out results/smoke.jsonl
+    --n-winds 0 --goal-km "$GOAL_KM" --direction "$DIRECTION" --keep-path --wind.path "$RECORD" --out results/smoke.jsonl
 done
 say "   and one with a miscalibrated belief, one with nested draws, and one of each new arm"
 uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 4 \
-  --goal-km "$GOAL_KM" --direction "$DIRECTION" --belief-scale 2.0 --out results/smoke.jsonl
+  --goal-km "$GOAL_KM" --direction "$DIRECTION" --belief-scale 2.0 --wind.path "$RECORD" --out results/smoke.jsonl
 uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 4 \
-  --goal-km "$GOAL_KM" --direction "$DIRECTION" --nested --nested-pool 16 --out results/smoke.jsonl
+  --goal-km "$GOAL_KM" --direction "$DIRECTION" --nested --nested-pool 16 --wind.path "$RECORD" --out results/smoke.jsonl
 LONG=$(uv run python -c "from balloon_sim.config import ExperimentConfig; print(max(ExperimentConfig().episode_lengths))")
 uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 0 \
-  --goal-km "$GOAL_KM" --direction "$DIRECTION" --n-moves "$LONG" --out results/smoke.jsonl
+  --goal-km "$GOAL_KM" --direction "$DIRECTION" --n-moves "$LONG" --wind.path "$RECORD" --out results/smoke.jsonl
 uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 0 \
-  --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective escape --out results/smoke.jsonl
+  --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective escape --wind.path "$RECORD" --out results/smoke.jsonl
 say "   and the new objectives, alone and as a fleet"
 FLEET=$(uv run python -c "from balloon_sim.config import ExperimentConfig; print(max(ExperimentConfig().fleet_sizes))")
 for OBJECTIVE in station targets; do
   uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 0 \
-    --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective "$OBJECTIVE" --keep-path --out results/smoke.jsonl
+    --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective "$OBJECTIVE" --keep-path --wind.path "$RECORD" --out results/smoke.jsonl
 done
 for OBJECTIVE in reach escape station targets; do
   uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 20 --n-winds 0 \
-    --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective "$OBJECTIVE" --n-agents "$FLEET" --keep-path --out results/smoke.jsonl
+    --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective "$OBJECTIVE" --n-agents "$FLEET" --keep-path --wind.path "$RECORD" --out results/smoke.jsonl
 done
 uv run scripts/run_cell.py --controller hindsight --seed 0 --sigma 0 --horizon 50 --n-winds 0 \
-  --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective targets --n-agents "$FLEET" --keep-path --out results/smoke.jsonl
+  --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective targets --n-agents "$FLEET" --keep-path --wind.path "$RECORD" --out results/smoke.jsonl
+
+if [[ ",$ARMS," == *",greedy,"* ]]; then
+  say "   and the greedy controller: MPC planning one move ahead"
+  uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon 1 --n-winds 0 \
+    --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective station --wind.path "$RECORD" --out results/smoke.jsonl
+fi
+if [[ ",$ARMS," == *",flight,"* ]]; then
+  say "   and the longest flight, greedy and at the base horizon, to see one run to the end of the record"
+  FLIGHT=$(uv run python -c "from balloon_sim.config import ExperimentConfig; print(max(ExperimentConfig().flight_lengths))")
+  for HORIZON in 1 20; do
+    uv run scripts/run_cell.py --controller mpc --seed 0 --sigma 3.2 --horizon "$HORIZON" --n-winds 0 \
+      --goal-km "$GOAL_KM" --direction "$DIRECTION" --objective station --n-moves "$FLIGHT" --wind.path "$RECORD" --out results/smoke.jsonl
+  done
+fi
 
 if [ "$RL" = "yes" ]; then
   say "   and a learned policy: two iterations on this record, then flown on one seed, to see it run end to end"
@@ -93,7 +115,7 @@ if [ "$RL" = "yes" ]; then
 fi
 
 say "6. the grid"
-uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --dry-run
+uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --dry-run -- --wind.path "$RECORD"
 if [ "$RL" = "yes" ]; then
   N_POLICIES=$(uv run python -c "from balloon_sim import rl; from balloon_sim.config import ExperimentConfig; print(len(rl.policies(ExperimentConfig())))")
   echo "   and $N_POLICIES learned policies, each trained, then flown on every seed and noise level:"
@@ -104,7 +126,7 @@ say "7. submit?"
 read -r -p "   type yes to send it to Slurm: " ANSWER
 [ "$ANSWER" = "yes" ] || { echo "   nothing submitted"; exit 0; }
 
-SUBMITTED=$(uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --keep-path | tee /dev/stderr)
+SUBMITTED=$(uv run scripts/submit.py --arms "$ARMS" --out "$OUT" --keep-path --minutes "$MINUTES" -- --wind.path "$RECORD" | tee /dev/stderr)
 JOBS=$(grep -o 'Submitted batch job [0-9]*' <<< "$SUBMITTED" | awk '{print $4}' | paste -sd: -)
 [ -n "$JOBS" ] || { echo "   no job ids came back from sbatch"; exit 1; }
 STAMP=${OUT##*rows-}
@@ -149,6 +171,8 @@ JOB
   JOBS="$JOBS:$TRAIN:$EVAL"
 fi
 
+FLIGHT_ONLY=no
+if [[ ",$ARMS," == *",flight,"* ]]; then FLIGHT_ONLY=yes; fi
 say "8. the analysis, queued to start when everything above has finished"
 # afterany, not afterok: a cell that fails loses one row, and the analysis should still run on the rest.
 # It joins this sweep's rows into one file (the one to commit), adds the earlier sweeps' rows beside them in
@@ -168,7 +192,7 @@ cd $PWD
 cat $OUT/*.jsonl > $OUT.jsonl
 echo "\$(wc -l < $OUT.jsonl) rows: \$(wc -l < results/cells.txt) sweep cells, and the learned policies' flights"
 cat $EARLIER $OUT.jsonl > results/rows-$STAMP-with-earlier.jsonl
-./analyse_all.sh results/rows-$STAMP-with-earlier.jsonl $STAMP
+FLIGHT=$FLIGHT_ONLY ./analyse_all.sh results/rows-$STAMP-with-earlier.jsonl $STAMP
 if [ "$RL" = "yes" ]; then uv run scripts/plot_rl.py policies --into figures/$STAMP-rl; fi
 JOB
 sbatch "results/analyse-$STAMP.sh"

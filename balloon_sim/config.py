@@ -163,6 +163,16 @@ class ExperimentConfig:
     new_objective_horizon: int = 20
     """The MPC horizon the station, targets and fleet arms hold fixed, as the escape arm does"""
 
+    flight_lengths: tuple[int, ...] = (50, 100, 200, 500)
+    """Episode lengths of the flight arm (decision 51), in three-hour moves: 6.25, 12.5, 25 and 62.5 days. Past
+    80 moves they need a record longer than the 10-day July one; run_all.sh checks the record covers them"""
+
+    flight_horizons: tuple[int, ...] = (1, 5, 20, 50, 100, 200, 500)
+    """MPC horizons of the flight arm, each flown at every length it fits inside. 1 is the greedy controller:
+    the level whose believed wind does best over the next move, nothing further ahead"""
+
+    flight_objectives: tuple[str, ...] = ("reach", "escape", "station", "targets")
+
     controllers: tuple[str, ...] = ("hindsight", "fixed_plan", "mpc")
 
 

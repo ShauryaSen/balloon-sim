@@ -17,7 +17,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.cells import BASE_GOAL_KM, BASE_MOVES
+from balloon_sim.cells import BASE_GOAL_KM, BASE_HORIZON, BASE_MOVES
 from balloon_sim.results import best_hindsight, one_arm, read_rows
 
 
@@ -206,7 +206,9 @@ def main(argv: list[str] | None = None) -> None:
             if most and fewest:
                 print(f"  sigma {s:5g}  N{fixed_draws[-1]} - N{fixed_draws[0]}: {compare(most, fewest, metric)}")
 
-    base = horizons[len(horizons) // 2] if horizons else None  # the middle horizon the arm flew
+    # the base horizon where the arm flew it; otherwise the middle one. Not the middle one always: the greedy
+    # arm adds horizon 1 to the arms it copies, which would move the middle of the main arm from 20 to 10
+    base = BASE_HORIZON if BASE_HORIZON in horizons else (horizons[len(horizons) // 2] if horizons else None)
     if base is not None:
         print(f"\nreplanning: MPC (horizon {base}, {mpc_draws[0]} draws) minus the fixed plan ({fixed_draws[0]} draws)")
         for s in sigmas:

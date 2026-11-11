@@ -239,6 +239,17 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     flown on the sweep's 32 seeds at every sigma through `fleet.fly`, paired with every other controller of
     the seed. Settings are PPO's usual (`RLConfig`), not tuned: its training curve is written beside it and
     drawn by `scripts/plot_rl.py`, and is to be read before its ranking.
+51. **A greedy baseline, and long flights with long horizons** (`greedy` and `flight` arms in
+    `balloon_sim/cells.py`). The 2026-11-05 policies trained to a plateau within the first third of training
+    and lost to MPC on every task. The greedy controller is MPC with a one-move horizon: the level whose
+    believed wind does best over the next three hours. It sees what the policy sees, the belief at every
+    level where the balloon is, so it separates a policy that learned badly from an input that holds too
+    little; its cells sit in the arms the policies flew. The flight arm flies every objective at 50, 100, 200
+    and 500 moves (6 to 62 days), with MPC and MPC not learning at horizons 1, 5, 20, 50, 100, 200 and 500
+    wherever the horizon fits inside the flight, each length with its own hindsight. Past 80 moves it needs a
+    record longer than the July one; a record starting on 2021-07-16 on the same grid keeps its 50-move cells
+    identical to the July sweep's. The forecast error is the same stationary process at every length: the
+    balloon always has a forecast as good as a day-old one, as with a forecast reissued daily.
 
 ## Open
 

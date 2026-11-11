@@ -38,6 +38,18 @@ for N in $FLEETS; do
     ARMS+=("fleet$N-$OBJECTIVE|--objective $OBJECTIVE --n-agents $N|--metric cost_km")
   done
 done
+# the flight arm (decision 51): one arm per flight length and objective, each with its own hindsight. Its
+# 50-move arms are the same cells as the main, escape, station and targets arms when the record starts on the
+# same day, which is why the flight run is analysed on its own rows (EARLIER="" in run_all.sh), and why
+# FLIGHT=yes reads only these arms, and FLIGHT=no (the default) leaves them out
+if [ "${FLIGHT:-no}" = "yes" ]; then ARMS=(); fi
+FLIGHTS=$($PYTHON -c "from balloon_sim.config import ExperimentConfig; print(*ExperimentConfig().flight_lengths)")
+for L in $FLIGHTS; do
+  [ "${FLIGHT:-no}" = "yes" ] || break
+  for OBJECTIVE in reach escape station targets; do
+    ARMS+=("flight$L-$OBJECTIVE|--objective $OBJECTIVE --n-moves $L|--metric cost_km")
+  done
+done
 
 for ARM in "${ARMS[@]}"; do
   NAME=${ARM%%|*}

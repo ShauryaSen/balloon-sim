@@ -258,8 +258,47 @@ def fleet_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -
     return out
 
 
+def greedy_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> list[Cell]:
+    """MPC with a horizon of one move, learning and not, on every arm the learned controller flew (decision 51).
+
+    A horizon of one is the greedy controller: each move, the level whose believed wind does best over the
+    next three hours. It sees what the learned policy sees (the belief's wind at every level where the balloon
+    is) and nothing further ahead, so it is the baseline that says whether PPO's shortfall against MPC is the
+    learning or the input. Its cells land in the arms they copy: the main arm, station, targets and each fleet,
+    beside the horizons those arms already flew, and pair with them by seed."""
+    out: list[Cell] = []
+    shapes = [("reach", 1), ("escape", 1), ("station", 1), ("targets", 1)]
+    shapes += [(objective, n) for n in experiment.fleet_sizes for objective in ("reach", "escape", "station", "targets")]
+    for objective, n_agents in shapes:
+        for seed in experiment.seeds:
+            for sigma in _ladder(experiment, fitted_sigma):
+                out.extend(Cell(which, seed, BASE_DIRECTION, sigma, 1, 0, BASE_GOAL_KM, 1.0, False, n_moves, objective, n_agents)
+                           for which in ("mpc", "mpc_blind"))
+    return out
+
+
+def flight_arm(experiment: ExperimentConfig, n_moves: int, fitted_sigma: float) -> list[Cell]:
+    """Long flights and long lookahead (decision 51): every objective at every flight length, with MPC and MPC
+    not learning at every horizon that fits inside the flight, from greedy (1) to the whole flight.
+
+    Each (length, objective) is its own task with its own hindsight, since the length changes what the
+    episode asks; inside one, every controller and horizon is paired by seed. One balloon, the belief's mean.
+    Lengths past 80 moves need a longer record than the 10-day July one."""
+    out: list[Cell] = []
+    for length in experiment.flight_lengths:
+        horizons = [h for h in experiment.flight_horizons if h <= length]
+        for objective in experiment.flight_objectives:
+            for seed in experiment.seeds:
+                out.append(Cell("hindsight", seed, BASE_DIRECTION, 0.0, length, 0, BASE_GOAL_KM, 1.0, False, length, objective))
+                for sigma in _ladder(experiment, fitted_sigma):
+                    out.append(Cell("fixed_plan", seed, BASE_DIRECTION, sigma, length, 0, BASE_GOAL_KM, 1.0, False, length, objective))
+                    out.extend(Cell(which, seed, BASE_DIRECTION, sigma, h, 0, BASE_GOAL_KM, 1.0, False, length, objective)
+                               for which in ("mpc", "mpc_blind") for h in horizons)
+    return out
+
+
 ARMS = {"scout": scout_arm, "main": main_arm, "distance": distance_arm, "calibration": calibration_arm, "nested": nested_arm, "length": length_arm, "escape": escape_arm,
-        "station": station_arm, "targets": targets_arm, "fleet": fleet_arm}
+        "station": station_arm, "targets": targets_arm, "fleet": fleet_arm, "greedy": greedy_arm, "flight": flight_arm}
 
 
 SWEEP = ("main", "distance", "calibration", "nested", "length", "escape", "station", "targets", "fleet")
