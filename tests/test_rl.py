@@ -97,3 +97,36 @@ def test_training_runs_and_saves(tmp_path):
     rl.save(tmp_path / "p.pkl", params, spec, config, curve, {})
     loaded, spec_back, blob = rl.load(tmp_path / "p.pkl")
     assert spec_back == spec and blob["curve"] == curve
+
+
+def test_every_view_has_the_size_it_says_and_flies():
+    truth = a_record()
+    mission, _ = fleet.draw_mission(a_task("targets", 3), jax.random.key(0), truth)
+    noise = rl.noise_from_key(BELIEF, jax.random.key(2))
+    levels = truth.altitude_km.shape[0]
+    for view in rl.VIEWS:
+        spec = _spec("targets", 3)._replace(view=view)
+        params = rl.init_params(jax.random.key(1), rl.obs_size(levels, view), RLConfig())
+        steps = rl.episode(spec, truth, params, mission, noise, jnp.array(2.0), jax.random.key(3), 1.0)
+        assert steps.obs.shape[-1] == rl.obs_size(levels, view), view
+        assert np.all(np.isfinite(np.asarray(steps.obs))), view
+        flight = fleet.fly(BalloonConfig(), rl.controller(spec, truth, params, mission, noise, jnp.array(2.0)), truth, mission,
+                           "targets", spec.n_moves, jax.random.key(4), 200.0)
+        assert np.isfinite(float(flight.cost_km)), view
+
+
+def test_the_ahead_view_is_where_holding_a_level_really_goes_on_a_perfect_forecast():
+    """One move ahead at the balloon's own level, with no forecast error, is where a move that does not climb ends"""
+    truth = a_record()
+    spec = _spec("reach", 1)._replace(view="ahead")
+    mission, _ = fleet.draw_mission(a_task("reach", 1), jax.random.key(0), truth)
+    mission = mission._replace(starts=mission.starts._replace(altitude_km=truth.altitude_km[1][None]))
+    noise = rl.noise_from_key(BELIEF, jax.random.key(2))
+    levels = truth.altitude_km.shape[0]
+    obs = rl.observe(spec, truth, noise, jnp.array(0.0), mission, mission.starts, Readings.empty(1),
+                     rl.Flags(jnp.zeros(1, bool), jnp.zeros(1, bool)), jnp.zeros((1, 2)), jnp.array(0))
+    ahead = np.asarray(obs[0, 11 + 2 * levels:]).reshape(len(rl.AHEAD_MOVES), levels, 2) * 1000.0  # km
+    from balloon_sim.dynamics import step
+    moved = step(truth, jax.tree.map(lambda a: a[0], mission.starts), jnp.array(0.0), BalloonConfig().step_hours, BalloonConfig().substeps)
+    want = np.asarray(rl._offset(moved.lat, moved.lon, mission.targets_lat[0], mission.targets_lon[0]))
+    np.testing.assert_allclose(ahead[0, 1], want, atol=5.0)

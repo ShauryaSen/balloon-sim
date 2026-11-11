@@ -250,6 +250,13 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     record longer than the July one; a record starting on 2021-07-16 on the same grid keeps its 50-move cells
     identical to the July sweep's. The forecast error is the same stationary process at every length: the
     balloon always has a forecast as good as a day-old one, as with a forecast reissued daily.
+52. **Wider views for the learned controller** (`Spec.view` in `balloon_sim/rl.py`). The 2026-11-05 policies
+    saw the belief only in their own column, where MPC plans 60 hours ahead on the whole field. "patch" adds
+    the belief at every level at eight points 500 km round the balloon, about the error's lengthscale.
+    "ahead" adds, for every level, the vector from where drifting on that level's believed wind would put the
+    balloon after 1, 4 and 16 moves to the point it is steering for: MPC's lookahead given to the policy as
+    features instead of searched. "column" is the original and stays the default. "ahead" trains about 13
+    times slower than "column" on a fleet of four.
 
 ## Open
 

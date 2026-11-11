@@ -30,6 +30,8 @@ def main(argv: list[str] | None = None) -> None:
     ask.add_argument("--objective", choices=("reach", "escape", "station", "targets"))
     ask.add_argument("--n-agents", type=int, default=1)
     ask.add_argument("--blind", action="store_true", help="never use a reading: the policy rl_blind")
+    ask.add_argument("--view", choices=rl.VIEWS, default="column",
+                     help="what of the field the policy sees: its own column, a patch round it, or where each level carries it")
     ask.add_argument("--index", type=int, help="train the policy at this position of rl.policies() instead")
     ask.add_argument("--record", default=WindConfig().path)
     ask.add_argument("--n-moves", type=int, default=TaskConfig().n_moves)
@@ -48,9 +50,9 @@ def main(argv: list[str] | None = None) -> None:
         objective, n_agents, learns = asked["objective"], asked["n_agents"], not asked["blind"]
     config = dataclasses.replace(RLConfig(), **{f.name: asked[f"rl.{f.name}"] for f in dataclasses.fields(RLConfig) if asked[f"rl.{f.name}"] is not None})
     task = TaskConfig(objective=objective, n_agents=n_agents, distance_km=BASE_GOAL_KM, direction=BASE_DIRECTION, n_moves=asked["n_moves"])
-    spec = rl.Spec(objective, n_agents, learns, task.n_moves, task.arrival_km, BalloonConfig(), BeliefConfig())
+    spec = rl.Spec(objective, n_agents, learns, task.n_moves, task.arrival_km, BalloonConfig(), BeliefConfig(), asked["view"])
     sigmas = tuple(round(m * BeliefConfig().sigma, 4) for m in experiment.sigma_multiples)
-    name = rl.policy_name(objective, n_agents, learns)
+    name = rl.policy_name(objective, n_agents, learns, asked["view"])
     print(f"training {name}: {config.iterations} iterations of {config.envs} episodes, {config.train_seeds} training tasks, sigma over {sigmas}")
 
     truth = load_record(asked["record"])

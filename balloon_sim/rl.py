@@ -14,6 +14,11 @@ What it sees, per balloon, all scaled to order one:
     the mean offset to the other balloons (zero alone)
     what its own anemometer reads minus what the forecast said there
     the belief's mean wind at its own position at every level of the record
+and, with a wider view (Spec.view, decision 52), more of the field than its own column:
+    "patch": the belief's mean at every level at eight points PATCH_KM east, west, north and south of it
+    "ahead": for every level, where that level would carry it after AHEAD_MOVES moves of drifting on the
+        belief's mean, as the vector from there to the objective's point: the lookahead MPC plans with,
+        handed over as features rather than searched
 
 The belief is the sweep's own: the GP around the forecast with the shared kernel, conditioned on every
 reading the fleet has taken (decision 48). `learns = False` gives "rl_blind", which never uses a reading:
@@ -94,11 +99,21 @@ def forecast_at(truth: WindField, config: BeliefConfig, noise: Noise, sigma: jax
 def belief_mean_at(config: BeliefConfig, sigma: jax.Array, prior: jax.Array, lat, lon, altitude_km, hours, readings: Readings) -> jax.Array:
     """The GP's mean at points, given readings whose uv holds reading minus forecast:
     prior + k(x, X) K^-1 (y - F(X)). prior (P, 2) is the forecast there; the points are (P,) each"""
+    return _correct(config, sigma, readings, _weights(config, sigma, readings), prior, lat, lon, altitude_km, hours)
+
+
+def _weights(config: BeliefConfig, sigma: jax.Array, readings: Readings) -> jax.Array:
+    """K^-1 (y - F(X)) of belief_mean_at, (R, 2): solved once, then read at as many points as wanted"""
     config = dataclasses.replace(config, sigma=sigma)
     real = jnp.arange(readings.lat.shape[0]) < readings.count
     residual = jnp.where(real[:, None], readings.uv, 0.0)
     factor = jnp.linalg.cholesky(_kernel_readings(config, readings))
-    alpha = jax.scipy.linalg.cho_solve((factor, True), residual)  # (R, 2)
+    return jax.scipy.linalg.cho_solve((factor, True), residual)
+
+
+def _correct(config: BeliefConfig, sigma: jax.Array, readings: Readings, alpha: jax.Array, prior: jax.Array, lat, lon, altitude_km, hours) -> jax.Array:
+    config = dataclasses.replace(config, sigma=sigma)
+    real = jnp.arange(readings.lat.shape[0]) < readings.count
     place = jnp.sqrt(jnp.sum((_inputs(config, lat, lon, altitude_km)[:, None] - _inputs(config, readings.lat, readings.lon, readings.altitude_km)[None]) ** 2, -1) + 1e-12)
     time = jnp.abs(hours[:, None] - readings.hours[None]) / config.hours
     k = sigma**2 * _matern52(place) * _matern32(time) * real[None]
@@ -118,10 +133,24 @@ class Spec(NamedTuple):
     radius_km: float
     balloon: BalloonConfig
     belief: BeliefConfig
+    view: str = "column"  # what of the field it sees: "column", "patch" or "ahead" (decision 52)
 
 
-def obs_size(levels: int) -> int:
-    return 11 + 2 * levels  # altitude, time left, sigma, vector (2), its length, flag, team (2), reading (2), belief (2 per level)
+VIEWS = ("column", "patch", "ahead")
+PATCH_KM = 500.0
+"""How far out the patch's points are: about the error's 544 km lengthscale, so each says something the
+column does not"""
+AHEAD_MOVES = (1, 4, 16)
+"""Moves of drift the "ahead" view looks at, per level: 3 hours, half a day, two days"""
+
+
+def obs_size(levels: int, view: str = "column") -> int:
+    base = 11 + 2 * levels  # altitude, time left, sigma, vector (2), its length, flag, team (2), reading (2), belief (2 per level)
+    if view == "patch":
+        return base + 8 * 2 * levels
+    if view == "ahead":
+        return base + len(AHEAD_MOVES) * 2 * levels
+    return base
 
 
 def _offset(lat0, lon0, lat1, lon1) -> jax.Array:
@@ -170,19 +199,67 @@ def observe(spec: Spec, truth: WindField, noise: Noise, sigma: jax.Array, missio
     else:
         team = jnp.zeros((1, 2))
 
+    alpha = _weights(spec.belief, sigma, readings) if spec.learns else None  # solved once for every point below
+    believed = lambda la, lo, al, h: _believed(spec, truth, noise, sigma, readings, alpha, la, lo, al, h)
+
     # the belief's mean at every level of the record at each balloon: N * levels points
     at = lambda f: jnp.repeat(f, levels)
     lat, lon, hours = at(state.lat), at(state.lon), at(state.hours)
     altitude_km = jnp.tile(truth.altitude_km, n)
-    prior = jax.vmap(lambda la, lo, al, h: forecast_at(truth, spec.belief, noise, sigma, la, lo, al, h))(lat, lon, altitude_km, hours)
-    mean = belief_mean_at(spec.belief, sigma, prior, lat, lon, altitude_km, hours, readings) if spec.learns else prior
+    mean = believed(lat, lon, altitude_km, hours)
     seen = residual if spec.learns else jnp.zeros_like(residual)
 
-    return jnp.concatenate([
+    parts = [
         altitude[:, None], left[:, None], noisy[:, None],
         vector / 1000.0, length[:, None] / 1000.0, flag[:, None], team / 1000.0,
         seen / 10.0, mean.reshape(n, 2 * levels) / 20.0,
-    ], axis=1)
+    ]
+    if spec.view == "patch":
+        east, north = jnp.array([1.0, 1.0, 0.0, -1.0, -1.0, -1.0, 0.0, 1.0]), jnp.array([0.0, 1.0, 1.0, 1.0, 0.0, -1.0, -1.0, -1.0])
+        dlat = jnp.degrees(PATCH_KM * north / RADIUS_KM)  # (8,)
+        dlon = jnp.degrees(PATCH_KM * east / RADIUS_KM) / jnp.cos(jnp.radians(state.lat))[:, None]  # (N, 8)
+        plat = jnp.clip(state.lat[:, None] + dlat[None], truth.lat[0], truth.lat[-1])
+        plon = (state.lon[:, None] + dlon) % 360.0
+        grid = lambda f: jnp.repeat(f.reshape(-1), levels)  # (N * 8 * levels,)
+        hours8 = jnp.repeat(state.hours, 8)
+        patch = believed(grid(plat), grid(plon), jnp.tile(truth.altitude_km, n * 8), jnp.repeat(hours8, levels))
+        parts.append(patch.reshape(n, 8 * 2 * levels) / 20.0)
+    elif spec.view == "ahead":
+        aim_lat, aim_lon = _aim(spec, mission, state, flags)  # (N,) each
+        dt = spec.balloon.step_hours * 3600.0
+
+        def drift(carry, _):
+            la, lo, h = carry
+            uv = believed(la, lo, altitude_km, h)
+            la = jnp.clip(la + jnp.degrees(uv[:, 1] * dt / 1000.0 / RADIUS_KM), truth.lat[0], truth.lat[-1])
+            lo = (lo + jnp.degrees(uv[:, 0] * dt / 1000.0 / RADIUS_KM) / jnp.cos(jnp.radians(la))) % 360.0
+            return (la, lo, h + spec.balloon.step_hours), (la, lo)
+
+        _, (path_lat, path_lon) = jax.lax.scan(drift, (lat, lon, hours), None, length=max(AHEAD_MOVES))  # (M, N * levels)
+        picks = jnp.array(AHEAD_MOVES) - 1
+        end_lat, end_lon = path_lat[picks], path_lon[picks]  # (K, N * levels)
+        if spec.objective == "escape":  # how far out each level carries it, from its own start
+            gap = _offset(at(mission.starts.lat)[None], at(mission.starts.lon)[None], end_lat, end_lon)
+        else:
+            gap = _offset(end_lat, end_lon, at(aim_lat)[None], at(aim_lon)[None])  # (K, N * levels, 2)
+        parts.append(jnp.moveaxis(gap.reshape(len(AHEAD_MOVES), n, levels, 2), 1, 0).reshape(n, -1) / 1000.0)
+    return jnp.concatenate(parts, axis=1)
+
+
+def _believed(spec: Spec, truth: WindField, noise: Noise, sigma: jax.Array, readings: Readings, alpha, lat, lon, altitude_km, hours) -> jax.Array:
+    """The belief's mean wind at points (P,) each: the forecast, conditioned on the readings if it learns"""
+    prior = jax.vmap(lambda la, lo, al, h: forecast_at(truth, spec.belief, noise, sigma, la, lo, al, h))(lat, lon, altitude_km, hours)
+    return _correct(spec.belief, sigma, readings, alpha, prior, lat, lon, altitude_km, hours) if spec.learns else prior
+
+
+def _aim(spec: Spec, mission: Mission, state: State, flags: Flags) -> tuple[jax.Array, jax.Array]:
+    """(N,) each: the point each balloon is steering for, as `observe` draws its vector to it"""
+    n = state.lat.shape[0]
+    if spec.objective == "targets":
+        d = distance_km(state.lat[:, None], state.lon[:, None], mission.targets_lat[None], mission.targets_lon[None])
+        nearest = jnp.argmin(jnp.where(flags.visited[None], jnp.inf, d), axis=1)
+        return mission.targets_lat[nearest], mission.targets_lon[nearest]
+    return jnp.full(n, mission.targets_lat[0]), jnp.full(n, mission.targets_lon[0])
 
 
 def move_cost(spec: Spec, mission: Mission, state: State, flags: Flags) -> jax.Array:
@@ -310,7 +387,7 @@ def train(spec: Spec, truth: WindField, missions: Mission, sigmas: tuple[float, 
     """PPO. Returns the trained parameters and the training curve: the mean cost per episode (km, as the sweep
     scores it) of the sampled episodes, every `every` iterations"""
     k_init, key = jax.random.split(key)
-    params = init_params(k_init, obs_size(truth.altitude_km.shape[0]), config)
+    params = init_params(k_init, obs_size(truth.altitude_km.shape[0], spec.view), config)
     optimiser = optax.chain(optax.clip_by_global_norm(config.max_grad_norm), optax.adam(config.learning_rate))
     opt_state = optimiser.init(params)
     ladder = jnp.array(sigmas)
@@ -423,8 +500,8 @@ def load(path: str | Path) -> tuple[dict, Spec, dict]:
     return jax.tree.map(jnp.asarray, blob["params"]), spec, blob
 
 
-def policy_name(objective: str, n_agents: int, learns: bool) -> str:
-    return f"{objective}-n{n_agents}-{'learns' if learns else 'blind'}"
+def policy_name(objective: str, n_agents: int, learns: bool, view: str = "column") -> str:
+    return f"{objective}-n{n_agents}-{'learns' if learns else 'blind'}" + ("" if view == "column" else f"-{view}")
 
 
 def policies(experiment) -> list[tuple[str, int, bool]]:
