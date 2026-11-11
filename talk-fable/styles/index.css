@@ -1,0 +1,82 @@
+/* The whole look of the deck. Colours match figures/style.py, so diagrams and plots agree. */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+:root {
+  --ink: #1c2433;
+  --muted: #8a93a3;
+  --faint: #e6e8ec;
+  --wash: #f4f5f7;
+  --hindsight: #1c2433;
+  --mpc: #2f6fde;
+  --fixed: #e2852e;
+  --goal: #c8372d;
+  --accent: #0f8a7a;
+  --noise: #7a5cc2;
+}
+
+.slidev-layout {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--ink);
+  background: #ffffff;
+  font-size: 19px;
+  line-height: 1.45;
+  padding: 0;
+}
+
+/* ---- the frame every content slide sits in ---- */
+.frame { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 40px 56px 34px; }
+.frame h1 {
+  font-size: 31px; line-height: 1.2; font-weight: 650; letter-spacing: -0.02em;
+  margin: 0 0 6px; max-width: 800px; color: var(--ink);
+}
+.frame .lede { font-size: 19px; color: #5c6676 !important; opacity: 1 !important; margin: 0; max-width: 760px; }
+.frame .body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; position: relative; }
+.frame .foot {
+  position: absolute; left: 56px; right: 56px; bottom: 14px; display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--muted); letter-spacing: 0.02em;
+}
+.frame .foot b { font-weight: 600; color: var(--ink); }
+
+.slidev-layout p { margin: 0; }
+.slidev-layout strong { font-weight: 650; }
+.slidev-layout img { display: block; }
+
+/* ---- small pieces used across slides ---- */
+.row { display: flex; gap: 28px; align-items: center; }
+.col { display: flex; flex-direction: column; }
+.grow { flex: 1; min-width: 0; }
+.center { align-items: center; justify-content: center; text-align: center; }
+.muted { color: var(--muted); }
+.small { font-size: 15px; }
+.tiny { font-size: 12.5px; }
+.cap { font-size: 14px; color: var(--muted); margin-top: 8px; }
+.label { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.round { border-radius: 8px; overflow: hidden; }
+.big { font-size: 44px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+.op { font-size: 40px; font-weight: 300; color: var(--muted); }
+.c-mpc { color: var(--mpc); } .c-fixed { color: var(--fixed); } .c-hind { color: var(--hindsight); }
+.c-accent { color: var(--accent); } .c-goal { color: var(--goal); } .c-noise { color: var(--noise); }
+
+.card { background: var(--wash); border-radius: 12px; padding: 18px 20px; }
+.card h3 { font-size: 20px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.01em; }
+.card p { font-size: 16px; color: #4a5365; line-height: 1.4; }
+.card.line { background: #fff; border: 1.5px solid var(--faint); }
+.bar-top { border-top: 4px solid var(--ink); border-radius: 4px 4px 12px 12px; }
+
+.chip {
+  display: inline-block; padding: 5px 13px; border-radius: 999px; background: var(--wash);
+  font-size: 15px; font-weight: 500; white-space: nowrap;
+}
+.chip.on { background: var(--ink); color: #fff; }
+.chip.teal { background: var(--accent); color: #fff; }
+.dot { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+.note-side { width: 236px; flex: none; font-size: 17px; line-height: 1.4; }
+.note-side .big { margin-bottom: 4px; }
+
+/* Slidev's click animation: a short fade, nothing that moves */
+.slidev-vclick-target { transition: opacity 250ms ease; }
+.slidev-vclick-hidden { opacity: 0 !important; pointer-events: none; }
