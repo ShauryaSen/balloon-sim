@@ -50,7 +50,9 @@ for c, r in flights.items():
     lon = unwrap(np.concatenate([[start_lon], r["path_lon"]]))
     lat = np.concatenate([[start_lat], r["path_lat"]])
     alt = np.concatenate([[r["path_altitude_km"][0]], r["path_altitude_km"]])
-    last = int(r["arrived_move"]) + 1 if r["arrived"] else len(lon) - 1  # the episode ends on arrival
+    # arrived_move counts moves from 1, and lon[m] is where the balloon is after move m (lon[0] is the launch),
+    # so the episode ends at lon[arrived_move]
+    last = int(r["arrived_move"]) if r["arrived"] else len(lon) - 1
     paths[c] = (lon, lat, alt, last)
 
 goal_lat = any_row["goal_lat"]
@@ -135,7 +137,7 @@ for c, r in flights.items():
     glat, glon = np.radians(goal_lat), np.radians(any_row["goal_lon"])
     d = 2 * 6371 * np.arcsin(np.sqrt(np.sin((glat - lat) / 2) ** 2 + np.cos(lat) * np.cos(glat) * np.sin((glon - lon) / 2) ** 2))
     if r["arrived"]:
-        d[int(r["arrived_move"]) + 1:] = 0
+        d[int(r["arrived_move"]):] = 0  # d[i] is after move i + 1, so this keeps moves 1..arrived_move
     cum = np.concatenate([[0.0], np.cumsum(d)])
     running[c] = cum * (r["cost_km"] / moves) / cum[-1]
 final = {c: running[c][-1] for c in ORDER}
