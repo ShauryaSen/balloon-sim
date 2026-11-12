@@ -254,41 +254,40 @@ So that's the question for the rest of the talk. Not "does it look real", but "i
 
 ---
 part: 3
-claim: NVIDIA had already built the kind of generator we were designing
-lede: cBottle generates wind for the whole globe. So we tried flying a balloon in it.
+claim: Trying cBottle
 ---
 
-<img src="/fig/cbottle-globe.png" class="round" style="width: 100%; height: 270px; object-fit: cover" />
-<div class="row" style="justify-content: space-between; margin-top: 10px">
-  <div class="cap" style="margin: 0">cBottle's wind at 20.6 km (released model, July)</div>
+<img src="/fig/cbottle-globe.png" class="round" style="width: 100%; height: 330px; object-fit: cover" />
+<div class="row" style="justify-content: flex-end; margin-top: 14px">
   <div class="small"><span class="chip">coarse global model</span> → <span class="chip">fine patches</span></div>
 </div>
 
 <!--
 ROHAN. About 1 minute. No clicks.
 
-In September we found cBottle, from NVIDIA. It's a big generative model of the whole atmosphere, and it's built the same way we'd planned ours: a coarse global model, then fine patches on top.
+In September we found cBottle, from NVIDIA. It's a generative model of the whole atmosphere, and it's built the way we'd planned to build ours: a coarse global model first, then fine patches on top of it.
 
-This is its wind, about 20 kilometres up. It looks great.
+This is its wind at about 20 km, from the released model. It looks really good.
 
-So the obvious thing to do was use it. If someone's already built the generator, we can skip ahead and start flying. In October we took the released model and used its wind as the world for our balloon.
+So the obvious thing was to just use it. If someone's already built the generator, we skip ahead and start flying. In October we took the released model and used its wind as the world for our balloon.
+
+[The picture: cBottle's wind at 20.6 km, released model, July.]
 -->
 
 ---
 part: 3
-claim: Nothing could steer in it
-lede: cBottle has two altitudes near the balloon's range, and both are fast.
+claim: "Wind by altitude: cBottle vs ERA5"
 ---
 
 <div class="row">
   <div class="grow"><Layers name="levels" :n="2" :shown="1" /></div>
   <div class="note-side">
-    <p class="muted small">Slowest wind on offer, at a typical place</p>
-    <div class="big c-fixed" style="margin-top: 8px">8.5 <span style="font-size: 20px">m/s</span></div>
-    <p class="small">cBottle</p>
+    <p>Slowest wind on offer, at a typical place</p>
+    <div class="big c-fixed" style="margin-top: 14px">8.5 <span style="font-size: 20px">m/s</span></div>
+    <p>cBottle</p>
     <div v-click="1">
-      <div class="big c-accent" style="margin-top: 16px">3.5 <span style="font-size: 20px">m/s</span></div>
-      <p class="small">ERA5</p>
+      <div class="big c-accent" style="margin-top: 18px">3.5 <span style="font-size: 20px">m/s</span></div>
+      <p>ERA5</p>
     </div>
   </div>
 </div>
@@ -298,13 +297,13 @@ ROHAN. About 1 minute. ONE CLICK brings in ERA5.
 
 And it didn't work. Every controller we tried just drifted.
 
-The reason is simple once you see it. cBottle outputs eight pressure levels for the whole atmosphere, and only two of them are anywhere near where a balloon flies. One at about 12 kilometres, one at about 21. So the balloon has two winds to choose from, and they're both fast. At a typical place, the slower of the two is still 8 and a half metres a second.
+The reason's pretty simple once you see it. cBottle outputs eight pressure levels for the whole atmosphere, and only two of them are anywhere near where a balloon flies, one around 12 km and one around 21. So the balloon has two winds to pick from, and both are fast. At a typical place the slower one is still 8.5 metres a second.
 
-[click] ERA5 has six levels in the same range. With six to choose from, there's usually a slow one: three and a half metres a second.
+[click] ERA5 has six levels in the same range. With six to pick from there's usually a slow one, around 3.5.
 
-So we switched to ERA5 as our true wind, and that's what every experiment since has used.
+So we switched to ERA5 as the true wind, and everything since uses it.
 
-[Numbers: the bars are average speeds in metres per second from our two records. 8.5 and 3.5 are the median of the calmest level, 20 to 50 north.]
+[If asked: 8.5 and 3.5 are the median of the calmest level, 20 to 50 N. Bars are average speeds from our two records.]
 -->
 
 ---
@@ -312,145 +311,194 @@ layout: statement
 part: 3
 ---
 
-<div class="muted" style="font-size: 20px; margin-bottom: 14px">cBottle is an excellent wind model. It was useless for our balloon.</div>
-<div style="font-size: 42px; font-weight: 650; letter-spacing: -0.025em; line-height: 1.15; max-width: 800px">
-  So what does a wind model have to get right, to be good for <span class="c-accent">control</span>?
+<div style="font-size: 42px; font-weight: 650; letter-spacing: -0.025em; line-height: 1.15; max-width: 820px">
+  What does a wind model need to get right for a balloon to <span class="c-accent">steer</span> in it?
 </div>
 
 <!--
 ROHAN. About 30 seconds. No clicks.
 
-That was the lesson. A wind model can be excellent by every general measure and still be useless for a balloon, because of one property nobody was checking.
+So cBottle is an excellent wind model by every general measure, and it was useless for us, because of one property nobody was checking.
 
-So this became the question. What does a wind model actually need to get right for control? And we'd need the answer anyway before building our next generator.
+That's really the question now. What does a wind model actually have to get right for control? We need that answer anyway before we build our next generator.
 
 To answer it we needed a way to measure "good for control". That's balloon-sim.
 -->
 
 ---
 part: 3
-claim: "balloon-sim: the balloon flies in the true wind, the controller only sees a forecast"
+claim: balloon-sim setup
 ---
 
 <div class="row center" style="gap: 14px">
-  <div class="col" style="width: 250px">
-    <div class="label">True wind</div>
+  <div class="col" style="width: 240px">
+    <div class="label">Truth (ERA5)</div>
     <img src="/fig/split-truth.png" class="round" />
-    <div class="cap">ERA5. The balloon flies here.</div>
   </div>
   <div class="op" v-click="1">−</div>
-  <div class="col" style="width: 250px" v-click="1">
+  <div class="col" style="width: 240px" v-click="1">
     <div class="label">Error</div>
     <img src="/fig/split-error.png" class="round" />
-    <div class="cap"><strong class="c-accent">We choose how big.</strong></div>
   </div>
   <div class="op" v-click="2">=</div>
-  <div class="col" style="width: 250px" v-click="2">
+  <div class="col" style="width: 240px" v-click="2">
     <div class="label">Forecast</div>
     <img src="/fig/split-forecast.png" class="round" />
-    <div class="cap">The controller plans here.</div>
   </div>
 </div>
 
+<div class="col" style="gap: 6px; margin-top: 20px; font-size: 17px" v-click="3">
+  <p>• The balloon flies in the truth. The controller only sees the forecast.</p>
+  <p>• Error is a Gaussian process draw (smooth noise), fitted to how much ERA5 wind changes in a day</p>
+  <p>• Noise levels: 0, 0.8, 1.6, <strong>3.2</strong>, 6.4, 12.8 m/s. 3.2 ≈ using yesterday's wind as the forecast</p>
+  <p>• 32 launches per level, the same for every controller</p>
+</div>
+
 <!--
-ROHAN. About 1.5 minutes. TWO CLICKS.
+ROHAN. About 1.5 minutes. THREE CLICKS.
 
-We wrote balloon-sim from scratch, small enough that we both understand every line. This is its main design decision.
+We wrote balloon-sim from scratch. Here's the setup. The truth is ERA5. That's the wind that actually moves the balloon.
 
-There are two winds. On the left is the true wind, which is ERA5. That's what actually moves the balloon.
+[click] We take the truth and subtract an error. The error is smooth random noise, a draw from a Gaussian process. We fitted it to how much ERA5's wind changes over a day, so at full size it's like using yesterday's wind as the forecast. And we pick how big it is.
 
-[click] We take the truth and subtract an error field. The error is random but smooth, with the same shape as a real forecast's error, which we fitted from the data. And we choose its size.
+[click] What's left is the forecast. The controller only ever sees the forecast.
 
-[click] What's left is the forecast. That's all the controller ever sees.
+[click] We test six noise levels, from zero, which is a perfect forecast, up to 12.8 metres a second. 3.2 is the yesterday's-wind level. A real weather forecast is probably more accurate than that. At each level we fly the same 32 launches with every controller, so when we compare two controllers it's the same flights.
 
-So we have a dial for how wrong the controller's picture of the world is. Zero means it knows the truth. A real day-old forecast is off by about 3.2 metres a second, and we can go well past that.
-
-[If asked: the error is drawn from a Gaussian process whose kernel was fitted to a day-old forecast's error: 3.2 m/s, about 540 km across, 1.3 km in altitude, 9 hours in time.]
+[If asked: Gaussian process with a Matérn kernel. Patches about 540 km across, 1.3 km in altitude, 9 hours in time.]
 -->
 
 ---
 part: 3
-claim: One launch, three controllers
+claim: Example flight to a goal 2,000 km downwind
 ---
 
-<SlidevVideo autoplay controls style="height: 418px; margin: 0 auto; border-radius: 8px" poster="/fig/flight.png">
-  <source src="/fig/flight.mp4" type="video/mp4" />
+<SlidevVideo autoplay controls style="height: 418px; margin: 0 auto; border-radius: 8px" poster="/fig/flight-s13.png">
+  <source src="/fig/flight-s13.mp4" type="video/mp4" />
 </SlidevVideo>
 
 <!--
 ROHAN. About 1.5 minutes. The film plays by itself, about 10 seconds. Replay it with the controls if you want to talk over it.
 
-Here's one flight, to make it concrete. The goal is the red ring, 2,000 kilometres downwind. Three controllers launch from the same place into the same wind. The bottom panel is their altitude.
+Here's one flight to make it concrete. Three controllers launch from the same spot into the same wind, with the forecast off by 3.2 metres a second. The goal is the red ring. The bottom panel is altitude over time.
 
-For two days all three ride the same fast wind west, at the top of the range.
+For the first day they all ride the same wind east.
 
-Then watch the blue and the black. Just before day two they drop down into a different wind, and it carries them into the ring.
+Orange made its whole plan at launch from the forecast. It stays low the whole flight. The forecast was off, so it drifts past and never comes back. Closest it gets is about 800 km.
 
-The orange one decided its whole flight at launch, from the forecast. The forecast was a bit off, so it drops too late, misses, and just keeps going.
+Black turns south at the right time and gets there in about four and a half days.
+
+Blue starts on a worse route, replans as it goes, loops back, and gets in about six hours after black.
+
+The bars on the right are each one's cost as it flies: distance from the goal, added up over the flight. A bar stops growing when its balloon gets to the goal. At the end: hindsight about 500 km, MPC about 640, the fixed plan about 2,400. In two slides I'll turn those three numbers into one score.
+
+[If asked: these bars use the cost the controllers are planned on, which stops counting at arrival. The averages on the score slide count all 50 moves. On this flight both give a score of 92 percent.]
 
 I'll say who's who on the next slide.
+
+[Launch 13 of the 32, from the 2026-10-24 sweep.]
 -->
 
 ---
 part: 3
-claim: Two reference points, and the controller we're measuring
+claim: Controllers and bounds
 ---
 
-<div class="row" style="align-items: stretch; gap: 18px">
-  <div class="card grow bar-top" style="border-color: var(--hindsight)">
-    <h3>Hindsight</h3>
-    <p>Plans on the <strong>true wind</strong>.</p>
-    <p style="margin-top: 10px">The best we could hope for.</p>
+<div class="row" style="justify-content: space-between; padding: 16px 0; border-top: 1.5px solid var(--faint);">
+  <div class="col" style="width: 440px; gap: 4px">
+    <p style="font-size: 24px; font-weight: 650">Hindsight</p>
+    <p style="font-size: 18px">Plans on the true wind.</p>
   </div>
-  <div class="card grow bar-top" style="border-color: var(--fixed)" v-click>
-    <h3 class="c-fixed">Fixed plan</h3>
-    <p>Plans on the <strong>forecast</strong>, once, at launch.</p>
-    <p style="margin-top: 10px">What you get if you never react.</p>
+  <div style="font-size: 24px">
+
+$V_{\text{hind}} = \mathbb{E}_w\big[\min_a J(a,w)\big]$
+
+</div>
+</div>
+<div class="row" style="justify-content: space-between; padding: 16px 0; border-top: 1.5px solid var(--faint);" v-click>
+  <div class="col" style="width: 440px; gap: 4px">
+    <p style="font-size: 24px; font-weight: 650" class="c-mpc">Best policy</p>
+    <p style="font-size: 18px">Reacts to where the balloon actually is, for example MPC.</p>
   </div>
-  <div class="card grow bar-top" style="border-color: var(--mpc)" v-click>
-    <h3 class="c-mpc">MPC</h3>
-    <p>Plans on the <strong>forecast</strong>, again after every move.</p>
-    <p style="margin-top: 10px">The controller we care about.</p>
+  <div style="font-size: 24px">
+
+$V_{\text{policy}} = \min_\pi \mathbb{E}_w\big[J(\pi,w)\big]$
+
+</div>
+</div>
+<div class="row" style="justify-content: space-between; padding: 16px 0; border-top: 1.5px solid var(--faint); border-bottom: 1.5px solid var(--faint);" v-click>
+  <div class="col" style="width: 440px; gap: 4px">
+    <p style="font-size: 24px; font-weight: 650" class="c-fixed">Fixed plan</p>
+    <p style="font-size: 18px">One plan from the forecast that is made at launch and is never changed.</p>
   </div>
+  <div style="font-size: 24px">
+
+$V_{\text{plan}} = \min_a \mathbb{E}_w\big[J(a,w)\big]$
+
+</div>
 </div>
 
-<div class="cap" style="margin-top: 18px" v-click>Same planner inside all three. Only what they know, and when they plan, is different.</div>
+<div style="text-align: center; margin-top: 22px; font-size: 32px" v-click>
+
+$V_{\text{hind}} \;\le\; V_{\text{policy}} \;\le\; V_{\text{plan}}$
+
+</div>
 
 <!--
 ROHAN. About 1.5 minutes. THREE CLICKS.
 
-To say how good a controller is, you need something to compare it to. So we have two reference points.
+To say how good MPC is, we need something to compare it to. So we have two bounds. J is the cost of a flight, roughly how far from the goal you were. w is the wind, which is uncertain given the forecast.
 
-Hindsight, in black, gets to plan on the true wind. Nobody can really do that, but it tells us the best that was possible on that day.
+Hindsight: for each wind, take the best plan for that wind, then average. That's knowing the true wind ahead of time. Nobody can do that, so nothing beats it.
 
-[click] The fixed plan, in orange, sees only the forecast. It plans the whole flight at launch and never changes it. That's what you get with no feedback.
+[click] The best policy reacts to where the balloon actually is. MPC is one policy. It replans every move from where the balloon actually is, so it sits at or above the best policy.
 
-[click] And MPC, in blue, sees the same forecast, but it replans after every move, from wherever the balloon actually ended up. That's the controller we're measuring.
+[click] Fixed plan: one plan, picked at launch from the forecast, and it has to work for every wind. No feedback.
 
-[click] All three use the same planner underneath, the one from Myles's paper. So the only differences are what they know and when they plan.
+[click] Reacting can only help compared to a fixed plan, and it can't beat knowing the wind. So hindsight ≤ best policy ≤ fixed plan. What we care about is how close to hindsight MPC gets.
 
-[If asked: hindsight is the best plan our search found on the true wind, not a proven optimum.]
+All three use the same planner, the one from Myles's paper. So the only differences are what they know and when they plan.
+
+[If asked: in practice hindsight is the best plan our search found on the true wind, not a proven optimum. The fixed plan plans on the forecast's mean, or on sampled winds when we hedge.]
 -->
 
 ---
 part: 3
-claim: "The score: how much of the gap does MPC close?"
+claim: Scoring MPC
 ---
 
-<GapBar />
+<div style="font-size: 24px; text-align: center; margin-bottom: 18px">
+
+$\text{score} = \dfrac{\textcolor{#e2852e}{\text{fixed}} - \textcolor{#2f6fde}{\text{MPC}}}{\textcolor{#e2852e}{\text{fixed}} - \text{hindsight}}$
+
+</div>
+
+<p style="font-size: 16px; margin: 0 0 4px">Average distance from the goal over a flight</p>
+
+<div style="border-top: 1.5px solid var(--faint); padding-top: 6px">
+  <ScoreRow title="Example flight" :fixed="2373" :mpc="644" :hindsight="503" />
+</div>
+
+<div style="border-top: 1.5px solid var(--faint); border-bottom: 1.5px solid var(--faint); padding-top: 6px" v-click>
+  <ScoreRow title="All 32 launches" :fixed="1778" :mpc="1209" :hindsight="1043" />
+</div>
 
 <!--
-ROHAN. About 1.5 minutes. TWO CLICKS.
+ROHAN. About 1.5 minutes. ONE CLICK.
 
-So for every flight we have a worst case and a best case. This bar is average distance from the goal over the flight. Fixed plan on the left, about 1,800 kilometres away on average. Hindsight on the right, about 1,000.
+So that gives us a ruler. For every flight we have a worst case, the fixed plan, and a best case, hindsight. The score is how much of the gap between them MPC closes. Distance here is average distance from the goal over the flight.
 
-[click] MPC lands somewhere in between. Here, about 1,200.
+On the example flight we just watched: fixed plan about 2,400 km, hindsight about 500, MPC about 640. So MPC closed 92 percent of the gap.
 
-[click] And the score is just how far along the bar it gets. With a real forecast's error, MPC closes 77 percent of the gap. The part it doesn't close is what the wrong forecast cost us.
+[click] Over all 32 launches, at 3.2 metres a second: fixed plan about 1,800 km, hindsight about 1,000, MPC about 1,200. That's 77 percent. The rest is what the wrong forecast cost us.
 
-This is the number that lets us compare across conditions. If we make the wind model worse and the score drops, that property mattered. If it doesn't drop, it didn't. Back to Shaurya for what we found.
+Note it isn't 100 percent even with a perfect forecast. With no error it's 87 percent, because the planner only looks 60 hours ahead and hindsight gets to plan the whole flight.
 
-[Numbers: averages over 32 launches at 3.2 m/s. Scored launch by launch instead, the median is 80 percent.]
+This is the number that lets us compare across conditions. If we make the wind model worse in some way and the score drops, that property mattered. If it doesn't drop, it didn't.
+
+Back to Shaurya.
+
+[Numbers: averages over the same 32 launches, MPC planning 60 hours ahead on the forecast's mean. Scored launch by launch, the median at 3.2 is 80 percent.]
 -->
 
 ---
@@ -557,30 +605,32 @@ Now results. Across the bottom is forecast error. Up the side is average distanc
 
 ---
 part: 4
-claim: The balloon's own wind readings added nothing
+claim: Using the balloon's own wind readings
 ---
 
 <div class="row">
   <div class="grow"><Layers name="readings" :n="3" :shown="1" /></div>
   <div class="note-side" v-click="2">
     <div class="big">0 <span style="font-size: 20px">of 24</span></div>
-    <p style="margin-top: 6px">comparisons where readings detectably helped.</p>
-    <p class="small muted" style="margin-top: 10px">One reading every 3 hours, against wind patterns 500 km wide.</p>
+    <p style="margin-top: 6px">comparisons where readings detectably helped</p>
+    <p style="margin-top: 10px">(4 horizons × 6 noise levels)</p>
   </div>
 </div>
 
 <!--
 ROHAN. About 1 minute. TWO CLICKS.
 
-This one surprised us. As the balloon flies it measures the wind where it is, and MPC can use that to correct its forecast. Loon did this. So we ran MPC with that switched on and off.
+This one surprised us. As the balloon flies it measures the wind where it is, and MPC can use that to correct its forecast. Loon did this. So we ran MPC with that switched on and switched off.
 
-[click] Each dot is one launch: the difference between using the readings and ignoring them. Below zero means readings helped.
+[click] Each dot is one launch: the difference between using the readings and ignoring them. Below zero means the readings helped.
 
-[click] The black diamonds are the averages, and they sit on zero the whole way across. We made 24 of these comparisons, across horizons and error levels, and readings didn't detectably help in any of them.
+[click] The black diamonds are the averages, and they sit on zero the whole way across. We made 24 of these comparisons, across planning horizons and error levels, and readings didn't detectably help in any of them.
 
-We think the reason is scale. The balloon takes one reading every three hours along a single line. The forecast error comes in patches about 500 kilometres wide. One reading just doesn't say much about where the balloon is going next.
+We think it's scale. The balloon gets one reading every three hours along a single line, and the forecast error comes in patches about 500 km wide. One reading just doesn't tell you much about where you're headed next.
 
-So the 570 kilometres from the last slide is all from replanning from where you actually are. None of it is from learning about the wind.
+So what MPC gains over the fixed plan comes from replanning from where you actually are, not from learning about the wind.
+
+[If asked: same answer on the cost that stops counting once the balloon arrives. The averages are a bit bigger there but still inside the noise.]
 -->
 
 ---
@@ -619,27 +669,30 @@ So there's a breaking point, and it sits somewhere between half of a real foreca
 
 ---
 part: 4
-claim: Planning for many possible winds only helps a controller that can't react
+claim: Planning on many possible winds
 ---
 
 <div class="row">
   <div class="grow"><Layers name="hedging" :n="3" :shown="1" /></div>
   <div class="note-side" v-click="3">
-    <p><strong class="c-fixed">The fixed plan</strong> gains about 200 km by hedging.</p>
-    <p style="margin-top: 12px"><strong class="c-mpc">MPC</strong> gains nothing. It fixes mistakes as they happen.</p>
+    <p><strong class="c-fixed">Fixed plan:</strong> ~200 km better, up to 3.2 m/s error</p>
+    <p style="margin-top: 12px"><strong class="c-mpc">MPC:</strong> no difference at any noise level</p>
+    <p style="margin-top: 12px">Same with the belief 2× too wide or 2× too narrow</p>
   </div>
 </div>
 
 <!--
 ROHAN. About 1 minute. THREE CLICKS.
 
-Last result. Instead of planning on the one forecast, a controller can draw many possible winds around it and pick the plan that's best on average. That's the textbook way to plan under uncertainty. This plot is what that buys you. Below zero means it helped.
+Last result from the sweep. Normally the planner scores each plan on the one forecast, the mean wind. The alternative is to draw a bunch of possible winds around the forecast and score each plan on its average over all of them. That's the textbook way to plan under uncertainty. Below zero means it helped.
 
-[click] For the fixed plan it helps, by about 200 kilometres, up to a real forecast's error. That makes sense. It gets one shot, so a plan that's robust to being wrong is worth having.
+[click] For the fixed plan it helps, by about 200 km, up to 3.2 metres a second of error. That makes sense. It gets one shot, so a plan that holds up when the forecast is wrong is worth having.
 
-[click] For MPC, nothing, at any error level.
+[click] For MPC it does nothing, at any error level.
 
-[click] We checked whether that's just because our uncertainty model happens to be right, by making it twice too wide and twice too narrow. Same answer. MPC corrects its mistakes as they happen, so preparing for them in advance is wasted effort.
+[click] We checked whether that's just because our uncertainty happens to be exactly right, by making it twice too wide and twice too narrow. Same answer. MPC fixes its mistakes as they happen, so preparing for them in advance doesn't buy anything.
+
+[If asked: 64 sampled winds for the fixed plan, 16 for MPC. Bars are 95 percent intervals over 32 launches.]
 -->
 
 ---
@@ -778,40 +831,32 @@ Each ladder goes from finer than the wind really varies to much coarser. So some
 
 ---
 part: 5
-claim: The same question for a learned controller
+claim: Learned controller (PPO)
 ---
 
-<div class="row" style="align-items: stretch; gap: 22px">
-  <div class="col grow" style="justify-content: center; gap: 10px">
-    <div class="card"><p class="tiny muted">SEES</p><h3 style="font-size: 17px">The forecast at every altitude, where it is</h3></div>
-    <div class="op" style="text-align: center; line-height: 0.6">↓</div>
-    <div class="card" style="background: var(--ink)"><p class="tiny" style="color: #ffffff99">POLICY</p><h3 style="font-size: 17px; color: #fff">One PPO policy, shared by every balloon in a fleet</h3></div>
-    <div class="op" style="text-align: center; line-height: 0.6">↓</div>
-    <div class="card"><p class="tiny muted">DOES</p><h3 style="font-size: 17px">Climb or sink</h3></div>
-  </div>
-  <div class="col" style="width: 380px; justify-content: center; gap: 12px">
-    <div v-click><span class="chip">built</span><p class="small" style="margin-top: 4px">Trained on separate launches, then flown on the same 32 as MPC.</p></div>
-    <div v-click><span class="chip">so far</span><p class="small" style="margin-top: 4px">The first policies lose to MPC on every task.</p></div>
-    <div v-click><span class="chip teal">now</span><p class="small" style="margin-top: 4px">Is it the learning, or what the policy sees? A greedy baseline and a wider view will tell us.</p></div>
-  </div>
+<Policy />
+
+<div class="row" style="gap: 10px; margin-top: 14px; justify-content: center" v-click="3">
+  <span class="chip on">64,000 training flights</span>
+  <span class="chip">tested on the same 32 launches as MPC</span>
+  <span class="chip">all 4 tasks</span>
+  <span class="chip">1 balloon and fleets of 4</span>
 </div>
 
 <!--
 ROHAN. About 1 minute. THREE CLICKS.
 
-Everything so far has been MPC. The original question was about learned controllers too: if you train a policy in a simulator, does it work in the real wind?
+Everything so far has been MPC. But we also care about learned controllers: if you train a policy in a simulator, does it work in real wind? So I added PPO to balloon-sim.
 
-So I've added a learned controller to balloon-sim. It's PPO. The policy sees the forecast at every altitude where the balloon is, and outputs climb or sink. For a fleet, every balloon runs the same policy.
+On the left is what each balloon sees: the forecast wind at every altitude where it is, plus how far and which way the goal is, how much time is left, what its own wind sensor reads compared to the forecast, and in a fleet, where the other balloons are.
 
-[click] It's trained on its own set of launches, then tested on exactly the same 32 as MPC, so it goes on the same plots.
+[click] That goes into one policy network, and every balloon in a fleet shares the same network. That's the standard multi-agent setup, MAPPO.
 
-[click] Honest status: the first policies lose to MPC on every task. They stop improving early in training.
+[click] And it outputs climb or sink, every three hours. Same choice MPC makes.
 
-[click] So we're working out why. One possibility is that it just hasn't learned well. The other is that it can't see enough. MPC looks 60 hours ahead across the whole map, and the policy only sees the column it's in. We've added a greedy baseline that sees exactly what the policy sees, and a wider view for the policy, to tell those apart.
+[click] The plan is to train it on 64,000 flights across all the noise levels, on launches separate from the ones we test on, then test it on the same 32 launches as MPC so it goes on the same plots. It's set up on all four tasks: reaching a goal, getting as far from the start as possible, station-keeping, and visiting several targets, with one balloon and with fleets of four.
 
-Once it's competitive, the coarser wind models become training environments, and that's the sim-to-real version of the same experiment.
-
-[This is the status as written in DESIGN.md entries 50 to 52. PPO settings are defaults, not tuned.]
+That's what we're running next. Back to Shaurya.
 -->
 
 ---
