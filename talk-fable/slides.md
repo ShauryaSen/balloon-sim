@@ -370,37 +370,6 @@ We wrote balloon-sim from scratch. Here's the setup. The truth is ERA5. That's t
 
 ---
 part: 3
-claim: Example flight to a goal 2,000 km downwind
----
-
-<SlidevVideo autoplay controls style="height: 418px; margin: 0 auto; border-radius: 8px" poster="/fig/flight-s13.png">
-  <source src="/fig/flight-s13.mp4" type="video/mp4" />
-</SlidevVideo>
-
-<!--
-ROHAN. About 1.5 minutes. The film plays by itself, about 10 seconds. Replay it with the controls if you want to talk over it.
-
-Here's one flight to make it concrete. Three controllers launch from the same spot into the same wind, with the forecast off by 3.2 metres a second. The goal is the red ring. The bottom panel is altitude over time.
-
-For the first day they all ride the same wind east.
-
-Orange made its whole plan at launch from the forecast. It stays low the whole flight. The forecast was off, so it drifts past and never comes back. Closest it gets is about 800 km.
-
-Black turns south at the right time and gets there in about four and a half days.
-
-Blue starts on a worse route, replans as it goes, loops back, and gets in about six hours after black.
-
-The bars on the right are each one's cost as it flies: distance from the goal, added up over the flight. A bar stops growing when its balloon gets to the goal. At the end: hindsight about 500 km, MPC about 640, the fixed plan about 2,400. In two slides I'll turn those three numbers into one score.
-
-[If asked: these bars use the cost the controllers are planned on, which stops counting at arrival. The averages on the score slide count all 50 moves. On this flight both give a score of 92 percent.]
-
-I'll say who's who on the next slide.
-
-[Launch 13 of the 32, from the 2026-10-24 sweep.]
--->
-
----
-part: 3
 claim: Controllers and bounds
 ---
 
@@ -457,9 +426,38 @@ Hindsight: for each wind, take the best plan for that wind, then average. That's
 
 [click] Reacting can only help compared to a fixed plan, and it can't beat knowing the wind. So hindsight ≤ best policy ≤ fixed plan. What we care about is how close to hindsight MPC gets.
 
-All three use the same planner, the one from Myles's paper. So the only differences are what they know and when they plan.
+All three use the same planner, the one from Myles's paper. So the only differences are what they know and when they plan. Here's what that looks like on one flight.
 
 [If asked: in practice hindsight is the best plan our search found on the true wind, not a proven optimum. The fixed plan plans on the forecast's mean, or on sampled winds when we hedge.]
+-->
+
+---
+part: 3
+claim: Example flight to a goal 2,000 km downwind
+---
+
+<SlidevVideo autoplay controls style="height: 418px; margin: 0 auto; border-radius: 8px" poster="/fig/flight-s13.png">
+  <source src="/fig/flight-s13.mp4" type="video/mp4" />
+</SlidevVideo>
+
+<!--
+ROHAN. About 1.5 minutes. The film plays by itself, about 10 seconds. Replay it with the controls if you want to talk over it.
+
+Here's one flight with all three, to make it concrete. They launch from the same spot into the same wind, with the forecast off by 3.2 metres a second. The goal is the red ring. The bottom panel is altitude over time.
+
+For the first day they all ride the same wind east.
+
+Orange, the fixed plan, made its whole plan at launch from the forecast. It stays low the whole flight. The forecast was off, so it drifts past and never comes back. Closest it gets is about 800 km.
+
+Black, hindsight, turns south at the right time and gets there in about four and a half days.
+
+Blue, MPC, starts on a worse route, replans as it goes, loops back, and gets in about six hours after black.
+
+The bars on the right are each one's cost as it flies: distance from the goal, added up over the flight. A bar stops growing when its balloon gets to the goal. At the end: hindsight about 500 km, MPC about 640, the fixed plan about 2,400. Next slide turns those three numbers into one score.
+
+[If asked: these bars use the cost the controllers are planned on, which stops counting at arrival. The averages on the score slide count all 50 moves. On this flight both give a score of 92 percent.]
+
+[Launch 13 of the 32, from the 2026-10-24 sweep.]
 -->
 
 ---
