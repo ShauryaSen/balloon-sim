@@ -582,33 +582,23 @@ Here's the pilot. The truth is ERA5, same as before. That's the wind that actual
 
 # Varying the forecast error, and three MPC settings
 
-<div class="side" style="grid-template-columns: 1fr 1fr">
-  <div>
-    <p><b>How wrong the forecast is</b></p>
-    <div class="dial">
-      <div v-for="(s, i) in ['0', '0.8', '1.6', '3.2', '6.4', '12.8']" :key="s">
-        <div :style="{ height: 14 + i * 26 + 'px', background: i === 3 ? '#1a1a1a' : '#c9ced8' }"></div>
-        <span :style="{ fontWeight: i === 3 ? 700 : 400 }">{{ s }}</span>
-      </div>
-    </div>
-    <p class="caption">m/s. <b style="color: #1a1a1a">3.2</b> is about what real forecasts miss by.</p>
-  </div>
-  <div v-click>
-    <p><b>Three MPC settings we also vary</b></p>
-    <ul>
-      <li><b>How far ahead it plans:</b> 15, 30, 60 or 150 hours</li>
-      <li><b>What it plans on:</b> one forecast, or many possible winds</li>
-      <li><b>Its own wind readings:</b> used, or ignored</li>
-    </ul>
-  </div>
+<ul class="vary">
+  <li><b>Forecast error:</b> 0, 0.8, 1.6, 3.2, 6.4, 12.8 m/s (3.2 is about what real forecasts miss by)</li>
+</ul>
+
+<div v-click>
+<p class="vary-h">Three MPC settings</p>
+<ul class="vary">
+  <li><b>How far ahead it plans:</b> 15, 30, 60 or 150 hours</li>
+  <li><b>What it plans on:</b> one forecast, or many draws from its belief</li>
+  <li><b>Its own wind readings:</b> used or not used</li>
+</ul>
 </div>
 
-
 <style>
-.dial { display: flex; gap: 10px; align-items: flex-end; height: 170px; margin-top: 0.6rem; }
-.dial > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.dial > div > div { width: 100%; border-radius: 4px; }
-.dial span { font-size: 0.95rem; }
+.vary { margin-top: 1rem; }
+.vary li { font-size: 1.2rem; margin-bottom: 0.7rem; }
+.vary-h { font-size: 1.2rem !important; font-weight: 600; color: #1a1a1a !important; margin-top: 1.6rem !important; }
 </style>
 
 <!--
@@ -616,7 +606,7 @@ ROHAN. About 1 minute. ONE CLICK.
 
 In the pilot we vary how wrong the forecast is. Six levels, from a perfect forecast up to four times a real one. 3.2 is about what real forecasts miss by when checked against balloons (3.2 to 3.8 m/s, Cadiou et al.).
 
-[click] We also vary three settings of MPC. How far ahead it plans, from 15 hours to 150. Whether it plans on the single forecast, or on many possible winds drawn around it. And whether it uses the wind the balloon measures as it flies, or ignores it.
+[click] We also vary three settings of MPC. How far ahead it plans, from 15 hours to 150. Whether it plans on one forecast, or on many draws from its belief about the wind. And whether it uses the wind readings the balloon takes as it flies, or not.
 
 Every controller flies the same 32 launches, so a difference is always the same flight with one thing changed. That's about 8,000 flights, run on the cluster.
 -->
