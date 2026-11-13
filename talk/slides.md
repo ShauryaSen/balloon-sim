@@ -389,7 +389,7 @@ The first bound is hindsight. For each wind, you take the best plan for that win
 
 All three use the same planner, the one from Myles's paper, so the only differences are what they know and when they plan. Next, one flight with all three.
 
-[If asked: hindsight is really the best plan our search found on the true wind, not a proven optimum. The fixed plan plans on the forecast mean, or on sampled winds when we hedge.]
+[If asked: hindsight is really the best plan our search found on the true wind, not a proven optimum. The fixed plan plans on the forecast mean.]
 
 [click] That gives us a score. The score is how much of the gap between the fixed plan and hindsight MPC closes. Cost is distance to the goal after every move, added up over the whole flight. If we make the wind model worse and the score drops, whatever we changed mattered. And since it's a percentage, we can compare it across tasks and days.
 -->
@@ -521,17 +521,17 @@ The truth is ERA5, same as before. That's the wind that actually moves the ballo
 
 ---
 
-# Varying the forecast error, and two MPC settings
+# Varying the forecast error and the controller
 
 <ul class="vary">
   <li><b>Forecast error:</b> 0, 0.8, 1.6, 3.2, 6.4, 12.8 m/s</li>
 </ul>
 
 <div v-click>
-<p class="vary-h">Two MPC settings</p>
+<p class="vary-h">Two controller settings</p>
 <ul class="vary">
-  <li><b>How far ahead it plans:</b> 15, 30, 60 or 150 hours</li>
-  <li><b>What it plans on:</b> one forecast, or many draws from its belief</li>
+  <li><b>Replanning:</b> fixed plan (never) or MPC (every move)</li>
+  <li><b>How far ahead MPC plans:</b> 15, 30, 60 or 150 hours</li>
 </ul>
 </div>
 
@@ -546,9 +546,9 @@ ROHAN. About 1 minute. ONE CLICK.
 
 In the pilot we vary how wrong the forecast is. Six levels, from a perfect forecast up to 12.8 metres a second.
 
-[click] We also vary two MPC settings. One is how far ahead it plans, from 15 hours to 150. The other is whether it plans on one forecast or on many draws from its belief about the wind.
+[click] We also vary two things about the controller. First, whether it replans as it flies: the fixed plan never does, MPC replans every move from where the balloon actually is. Second, how far ahead MPC plans, from 15 hours to 150.
 
-Every controller flies the same 32 launches, so a difference is always the same flight with one thing changed. That's about 8,000 flights, run on the cluster.
+Every controller flies the same 32 launches, so a difference is always the same flight with one thing changed.
 -->
 
 ---
@@ -595,26 +595,6 @@ But on the right, once the forecast gets bad enough, the lines have basically me
 So there's a breaking point, somewhere between 1.6 and 3.2 metres a second.
 
 [If asked: paired comparisons between neighbouring horizons are detectable up to 1.6 m/s and not from 3.2 on. Bars are 95 percent intervals over 32 launches.]
--->
-
----
-
-# Planning on many possible winds
-
-<div style="width: 560px; margin: 0.6rem auto 0"><Layers name="hedging" :n="3" :shown="1" /></div>
-
-<!--
-ROHAN. About 1 minute. TWO CLICKS.
-
-Next is what MPC plans on. Normally the planner scores each plan on the one forecast, the mean wind. The alternative is to draw a bunch of possible winds around the forecast and score each plan on its average over all of them. That's the textbook way to plan under uncertainty. Below zero means it helped.
-
-[click] For the fixed plan it helps, by about 10,000 km, at the low and middle error levels. That makes sense, since it only gets one shot. So a plan that holds up when the forecast is wrong is worth having.
-
-[click] For MPC it does nothing, at any error level.
-
-We checked whether that's just because our uncertainty happens to be exactly right, by making it twice too wide and twice too narrow. Same answer. MPC fixes its mistakes as they happen, so preparing for them ahead of time doesn't help.
-
-[If asked: 64 sampled winds for the fixed plan, 16 for MPC. Bars are 95 percent intervals over 32 launches.]
 -->
 
 ---
