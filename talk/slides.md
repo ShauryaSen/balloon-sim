@@ -825,7 +825,7 @@ If asked about kind of error: it isn't a setting, so it's not here. It tells us 
     <div class="q-n">4</div>
     <div>
       <p class="q-t">What should this build toward?</p>
-      <p class="q-c">The GitHub repo with the generator and the environment, and a paper from the experiments. What else?</p>
+      <p class="q-c">Definitely a GitHub repo with the generator and the environment. What should the experiments lead to as a research output, and what would be next steps?</p>
     </div>
   </div>
 </div>
@@ -844,7 +844,7 @@ Four things we'd like your input on.
 One: the properties. We have four so far. What else would you degrade?
 Two: the stand-in. A degraded copy of ERA5 is wrong in one way, which is why a drop in score has one cause. A real generator is wrong in several ways at once. Does what we learn from the copies carry over?
 Three: the tasks. We have station keeping, navigating to waypoints, and getting as far from launch as possible. Which should we run first and report as the main result?
-Four (Rohan): long-term goals. What should all this build toward? One part is the GitHub repo with the actual generator and the environment. But we'd want the experiments to lead to something too, like a paper. What do you think that should look like?
+Four (Rohan): long-term goals. What should all this build toward? One part is definitely a GitHub repo with the generator and the environment. But what should the experiments lead to as a research output, and what would be the next steps?
 Leave this slide up for the discussion.
 If the discussion goes to training data: the experiment doesn't measure it; it's about resolution.
 -->
