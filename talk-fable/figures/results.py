@@ -22,7 +22,7 @@ from plot_scout import scouted  # noqa: E402
 MOVES = 50
 SIGMAS = [0.0, 0.8, 1.6, 3.2, 6.4, 12.8]
 X = np.arange(len(SIGMAS))
-REAL = SIGMAS.index(3.2)  # a real day-old forecast's error
+REAL = SIGMAS.index(3.2)  # about a real forecast's error
 rows = best_hindsight(one_arm(read_rows([REPO / "results" / "rows-2026-10-24.jsonl"])))
 
 
@@ -65,7 +65,7 @@ def error_axis(ax, label: bool = True) -> None:
 def mark_real(ax, y: float, va: str = "bottom"):
     """Says which rung of the ladder is a real forecast's error"""
     line = ax.axvline(REAL, color=FAINT, linewidth=10, zorder=0)
-    text = ax.text(REAL, y, "a real day-old\nforecast", ha="center", va=va, fontsize=10.5, color=MUTED, linespacing=1.15)
+    text = ax.text(REAL, y, "about a real\nforecast's error", ha="center", va=va, fontsize=10.5, color=MUTED, linespacing=1.15)
     return [line, text]
 
 
