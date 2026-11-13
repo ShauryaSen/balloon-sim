@@ -430,21 +430,26 @@ The bars on the right are each one's cost as it flies: distance from the goal, a
 
 # Scoring MPC
 
-<div style="font-size: 24px; text-align: center; margin-bottom: 18px">
+How much of the gap between the fixed plan and hindsight MPC closes. Cost is average distance from the goal over a flight.
+
+<div class="score-eq">
 
 $\text{score} = \dfrac{\textcolor{#e2852e}{\text{fixed}} - \textcolor{#2f6fde}{\text{MPC}}}{\textcolor{#e2852e}{\text{fixed}} - \text{hindsight}}$
 
 </div>
 
-<p style="font-size: 16px; margin: 0 0 4px">Average distance from the goal over a flight</p>
-
-<div style="border-top: 1.5px solid var(--faint); padding-top: 6px">
+<div style="border-top: 1px solid #e3e3e3; padding-top: 6px">
   <ScoreRow title="Example flight" :fixed="2373" :mpc="644" :hindsight="503" />
 </div>
 
-<div style="border-top: 1.5px solid var(--faint); border-bottom: 1.5px solid var(--faint); padding-top: 6px" v-click>
+<div style="border-top: 1px solid #e3e3e3; border-bottom: 1px solid #e3e3e3; padding-top: 6px" v-click>
   <ScoreRow title="All 32 launches" :fixed="1778" :mpc="1209" :hindsight="1043" />
 </div>
+
+<style>
+.score-eq { text-align: center; margin: 0.4rem 0 0.6rem; }
+.score-eq .katex { font-size: 1.6em; }
+</style>
 
 <!--
 ROHAN. About 1.5 minutes. ONE CLICK.
@@ -596,7 +601,9 @@ That's about 8,000 flights, run on the cluster.
 
 # First: only goals downwind are reachable at all
 
-<Layers name="scouting" :n="3" :shown="1" />
+We scored 20 candidate tasks against a rule written down first. One passed: a goal 2,000 km downwind.
+
+<div style="width: 760px; margin: 0.6rem auto 0"><Layers name="scouting" :n="3" :shown="1" /></div>
 
 <!--
 ROHAN. About 1 minute. TWO CLICKS.
