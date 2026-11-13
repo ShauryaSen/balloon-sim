@@ -401,8 +401,6 @@ All three use the same planner, the one from Myles's paper. So the only differen
 
 # Choosing the task: only goals downwind are reachable
 
-We scored twenty candidate tasks against a rule written down beforehand. One passed.
-
 <div style="width: 760px; margin: 0.6rem auto 0"><Layers name="scouting" :n="3" :shown="1" /></div>
 
 <!--
