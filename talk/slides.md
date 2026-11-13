@@ -33,7 +33,7 @@ Shaurya, 20 seconds. Walk through the five sections in one sentence each.
 ---
 
 <div class="divider">
-  <p class="divider-label">Part 1 · Shaurya</p>
+  <p class="divider-label">Part 1</p>
   <h1>Background and our generator</h1>
   <p class="divider-q">Why do balloons need a new wind generator?</p>
   <Sections :current="1" />
@@ -216,7 +216,7 @@ Video: blog/tools/wind_globe.py, Stage 1 -> Stage 2 output for 2023-07-10, ~53 h
 ---
 
 <div class="divider">
-  <p class="divider-label">Part 2 · Shaurya</p>
+  <p class="divider-label">Part 2</p>
   <h1>Evaluating the generator</h1>
   <p class="divider-q">Does our wind look like real wind?</p>
   <Sections :current="2" />
@@ -289,7 +289,7 @@ But it's random texture: no jets or storms that persist and move, and the same w
 ---
 
 <div class="divider">
-  <p class="divider-label">Part 3 · Rohan</p>
+  <p class="divider-label">Part 3</p>
   <h1>Measuring transfer</h1>
   <p class="divider-q">How do we measure whether a controller built on a wind model works in real wind?</p>
   <Sections :current="3" />
@@ -520,7 +520,7 @@ Shaurya goes through these in detail at the end. Before that, we ran a pilot usi
 ---
 
 <div class="divider">
-  <p class="divider-label">Part 4 · Rohan</p>
+  <p class="divider-label">Part 4</p>
   <h1>Forecast-error experiment</h1>
   <p class="divider-q">How much random error can control tolerate?</p>
   <Sections :current="4" />
@@ -733,7 +733,7 @@ First, control handles realistic random error fine. At a real forecast's error M
 ---
 
 <div class="divider">
-  <p class="divider-label">Part 5 · Shaurya</p>
+  <p class="divider-label">Part 5</p>
   <h1>Fidelity experiment (planned)</h1>
   <p class="divider-q">Which properties of a wind model matter for transfer?</p>
   <Sections :current="5" />
