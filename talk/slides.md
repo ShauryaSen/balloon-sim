@@ -805,38 +805,32 @@ Images: talk/public/fig/split-truth-px.png and split-coarse-px.png, drawn by tal
 
 # Candidate properties
 
-Each one degraded in steps, from ERA5 to very coarse. Not a fixed list.
-
-<table class="pt">
-  <tr><td>Altitude levels</td><td>18 → 9 → 6 → 3 → 2 → 1</td></tr>
-  <tr><td>Time between frames</td><td>3 h → 6 h → 12 h → 24 h → frozen</td></tr>
-  <tr><td>Grid spacing</td><td>2° → 4° → 8° → 16°</td></tr>
-  <tr><td>Kind of error, same size</td><td>constant or random; same at every altitude or different at each</td></tr>
-</table>
+<ul class="cp">
+  <li><b>Altitude levels</b></li>
+  <li><b>Grid spacing</b></li>
+  <li><b>Time between frames</b></li>
+  <li><b>Locations:</b> one patch of ERA5, or many</li>
+  <li><b>Kind of error, same size:</b> e.g. Gaussian process or simplex</li>
+</ul>
 
 <p v-click class="pt-bet"><b>Expected:</b> altitude levels matter most. The balloon steers on differences between altitudes.</p>
 
 <style>
-.pt { width: 100%; margin-top: 1.4rem; border-collapse: collapse; font-size: 1.15rem; }
-.pt td { padding: 0.75rem 0.4rem; border-bottom: 1px solid #e6e8ec; border-top: none; }
-.pt tr:first-child td { border-top: 1px solid #e6e8ec; }
-.pt td:first-child { font-weight: 600; width: 260px; color: #1a1a1a; }
-.pt td:last-child { color: #333; }
-.pt-bet { margin-top: 1.6rem !important; color: #1a1a1a !important; }
+.cp { margin-top: 1.6rem !important; font-size: 1.3rem; padding-left: 1.4rem !important; }
+.cp li { margin: 0.7rem 0 !important; }
+.cp b { font-weight: 600; color: #1a1a1a; }
+.pt-bet { margin-top: 2rem !important; color: #1a1a1a !important; }
 .pt-bet b { font-weight: 600; color: #4f7db3; }
 </style>
 
 <!--
 Shaurya, about 45 seconds. ONE CLICK.
-Which properties? These are the candidates. None of it is locked.
-The first three are resolution. Altitude levels: keep fewer of them, from all 18 down to one. Time between frames: from every 3 hours to a wind that never changes. Grid spacing: from 2 degrees to 16.
-Each ladder runs from the truth to past the wind's own scale. The wind decorrelates in about 31 hours and about 1,050 km, so somewhere on each ladder the score should drop.
-The fourth is different. The size of the error stays the same and its kind changes: a constant offset or random, the same at every altitude or different at each.
+These are the candidates. None of it is locked, and each is made worse in steps, one at a time.
+The first three are resolution: how many altitude levels, how fine the grid, how far apart the frames are in time.
+Locations: one patch of ERA5, or winds from many places. If one patch is enough, the generator can output less and train on less.
+Kind of error: the error in Rohan's pilot was a Gaussian process draw. Here the size stays the same and only its kind changes, for example a Gaussian process against simplex noise.
 [click] Our bet is that altitude levels matter most, because the balloon steers on the differences between altitudes.
-The sharpest test of that is in the fourth row. Two errors of the same size, 4.5 m/s. A uniform offset leaves the differences between altitudes unchanged. An offset that grows with altitude changes them by 2.65 m/s. If the bet is right, only the second one hurts.
-Why we expect it: cBottle had two levels near the balloon, both fast, and nothing could steer. And in Part 4 only downwind goals were reachable.
-We'd run each one across several tasks and both kinds of controller.
-Sources: ladders and the 31 h / 1,050 km / 4.5 / 2.65 figures from balloon-sim/docs/fidelity-design-2026-11-06.md.
+Why we expect it: in Rohan's part only downwind goals were reachable, and the balloon's only choice is which altitude to sit at.
 -->
 
 ---
@@ -868,9 +862,7 @@ The task pictures are schematic. Figures: talk/figures/tasks.py
 
 ---
 
-# Toward a minimal generator
-
-Each resolution property is a generator setting. Where the score holds, the setting can be coarser.
+# Minimal generator
 
 <table class="pt mg">
   <tr><th>Generator setting</th><th>Today</th><th>Coarsest that still transfers</th></tr>
@@ -878,8 +870,6 @@ Each resolution property is a generator setting. Where the score holds, the sett
   <tr><td>Time between frames</td><td>1 h</td><td class="q">?</td></tr>
   <tr><td>Grid spacing</td><td>0.25°</td><td class="q">?</td></tr>
 </table>
-
-<p class="mg-note">The experiment starts from ERA5 at 2° and every 3 h, so it tests coarser than that.</p>
 
 <p v-click class="pt-bet"><b>Result:</b> the cheapest generator that still transfers.</p>
 
@@ -901,7 +891,7 @@ Three of the properties are settings of our generator: how many altitude levels 
 The experiment fills in the last column: for each setting, the coarsest step where the score still holds.
 One limit: the experiment's truth is ERA5 at 2 degrees and every 3 hours, so it can say how much coarser than that is fine, not anything about finer detail.
 [click] Put the three together and that's the cheapest generator that still transfers.
-If asked about training data: this doesn't measure it. We degrade copies of ERA5, so it tells us about resolution, not how much data a generator needs.
+If asked about locations: it's about training data, not resolution, so it isn't a row here. If one patch is enough, the generator can be smaller and train on less.
 If asked about kind of error: it isn't a setting, so it's not here. It tells us which mistakes a generator can afford.
 -->
 
@@ -914,7 +904,7 @@ If asked about kind of error: it isn't a setting, so it's not here. It tells us 
     <div class="q-n">1</div>
     <div>
       <p class="q-t">Which other properties would you test?</p>
-      <p class="q-c">So far: altitude levels, time between frames, grid spacing, kind of error.</p>
+      <p class="q-c">So far: altitude levels, grid spacing, time between frames, locations, kind of error.</p>
     </div>
   </div>
   <div class="q">
