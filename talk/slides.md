@@ -221,7 +221,7 @@ Generated wind against held-out ERA5.
 
 <Checks />
 
-<p v-click class="caption" style="margin-top: 0.8rem">ERA5 floor: one half of held-out ERA5 scored against the other half.</p>
+<p v-click class="caption" style="margin-top: 0.8rem">ERA5 reference: one half of held-out ERA5 scored against the other half. Closer to it is better.</p>
 
 <!--
 Shaurya, 1 min.
@@ -230,7 +230,7 @@ Wind speeds: how hard the balloon is pushed, including extremes.
 Structure in space: how the wind varies along the path.
 Change with altitude: the options the balloon steers between. The one that matters most for control.
 Change over time: how the wind evolves during a flight.
-Floor: two halves of real ERA5 still differ, so that's the best possible score.
+Reference: two halves of real ERA5 still differ, so that's the best possible score. Closer to it is better. (Say "reference", not "floor": "floor" confused people before.)
 Reference: held-out ERA5, NE Pacific, days 8-14 of Jan/Apr/Jul/Oct 2023, not used in training.
 -->
 
@@ -246,11 +246,11 @@ Closer to ERA5 than BLE's generator on all four checks. Change over time is stil
 
 <!--
 Shaurya, 2 min. One click adds simplex noise.
-Lower is better. The dotted line is the ERA5 floor.
-Speeds: distance between wind-speed distributions, 2.98 vs BLE's 4.56. Ours still misses extremes (tail error 13.5 m/s vs a floor of 2.9).
-Space: the finest scale it keeps. Ours keeps detail down to about 340 km, BLE about 840. ERA5's floor and simplex both show 56 km, which is the grid limit: they keep detail all the way down, so 56 means 'as fine as the grid can show', not a measured scale.
+Lower is better. The dotted line is the ERA5 reference; closer to it is better.
+Speeds: distance between wind-speed distributions, 2.98 vs BLE's 4.56. Ours still misses extremes (tail error 13.5 m/s vs the ERA5 reference of 2.9).
+Space: the finest scale it keeps. Ours keeps detail down to about 340 km, BLE about 840. The ERA5 reference and simplex both show 56 km, which is the grid limit: they keep detail all the way down, so 56 means 'as fine as the grid can show', not a measured scale.
 Altitude: error in the shear between neighbouring levels, mean of east-west and north-south. Ours 1.0, BLE 2.1. Honest note: on north-south alone, BLE is better (0.61 vs 1.01).
-Time: dispersion error, how far off the spreading of drifting particles is over time compared with ERA5. Ours 0.81, BLE 1.79, floor 0.18. Better than BLE, but still about 4 times the floor, so time is our weakest check. The summer model makes 4-hour blocks, so we tiled it in time with InfiniteDiffusion to get 24-hour runs. Caveat: BLE's run is 48 hours at 6-hourly, ours 24 hours hourly, two runs of ours, so treat this panel as rough.
+Time: dispersion error, how far off the spreading of drifting particles is over time compared with ERA5. Ours 0.81, BLE 1.79, ERA5 reference 0.18. Better than BLE, but still about 4 times the reference, so time is our weakest check. The summer model makes 4-hour blocks, so we tiled it in time with InfiniteDiffusion to get 24-hour runs. Caveat: BLE's run is 48 hours at 6-hourly, ours 24 hours hourly, two runs of ours, so treat this panel as rough.
 Click: simplex noise, the kind BLE uses as forecast error, fitted to ERA5. It beats both generators on all four. That's the next slide.
 If asked about the "structure" measure: the spectral residual (SR) is the average gap between our energy spectrum and ERA5's, across all scales. Effective resolution is the smallest scale where we still have half of ERA5's energy. They tell the same story (ours 1.53 vs BLE 2.73); effective resolution is in km, so it's easier to read. Full table in the backup.
 Caveats: BLE and simplex are one sample each; ours is 112 blocks. No repeated runs, so no error bars.
@@ -935,7 +935,7 @@ If the discussion goes to training data: the experiment doesn't measure it; it's
 
 <div class="compact">
 
-| Check | Metric (lower is better unless noted) | ERA5 floor | Simplex | BLE's VAE | Ours (summer) |
+| Check | Metric (lower is better unless noted) | ERA5 reference | Simplex | BLE's VAE | Ours (summer) |
 |---|---|---|---|---|---|
 | Speeds | W1(u \| place, time) (m/s) | 2.08 | 4.69 | n/a | 3.00 |
 | | W1(v \| place, time) (m/s) | 2.67 | 2.08 | n/a | 4.04 |

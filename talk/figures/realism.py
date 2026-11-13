@@ -6,11 +6,11 @@ then the same with fitted simplex noise added.
 
 Numbers are copied, not recomputed, from one source: the summer model at 4 years / 250k steps, the checkpoint the
 poster declares.
-  balloon-env-dev/docs/benchmark-reports/benchmark_v2_4yr_250000.md   (columns: self-split floor, simplex noise,
+  balloon-env-dev/docs/benchmark-reports/benchmark_v2_4yr_250000.md   (columns: self-split reference, simplex noise,
                                                                         ble_vae, idiff m2cond)
 Change over time: balloon-env-dev/docs/benchmark-reports/temporal_4yr_250000.md (run 2026-11-12, the summer model
 tiled in time by InfiniteDiffusion; BLE 6-hourly over 48 h). Simplex 0.53 is from the 250k report. Dispersion: log-MSD RMSE; simplex 0.70 from the 250k report.
-Lower is better in every panel. The dotted line is the ERA5 floor: one half of held-out ERA5 scored against the other.
+Lower is better in every panel. The dotted line is the ERA5 reference: one half of held-out ERA5 scored against the other.
 
 Run from the repo root:  uv run python talk/figures/realism.py
 """
