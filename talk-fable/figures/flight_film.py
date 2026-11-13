@@ -58,6 +58,24 @@ for c, r in flights.items():
 goal_lat = any_row["goal_lat"]
 goal_lon = start_lon + ((any_row["goal_lon"] - start_lon + 180) % 360 - 180)
 
+
+def km_to_goal(lat, lon):
+    p1, p2 = np.radians(lat), np.radians(goal_lat)
+    h = np.sin((p2 - p1) / 2) ** 2 + np.cos(p1) * np.cos(p2) * np.sin(np.radians(goal_lon - lon) / 2) ** 2
+    return 2 * 6371 * np.arcsin(np.sqrt(h))
+
+
+# The simulator only checks arrival at the end of each move, but the balloon crosses the ring somewhere during
+# its arrival move. The film stops each balloon where its drawn path first crosses the ring, so it never
+# slides on inside it. stop[c] is that moment in moves (e.g. 34.2); for a balloon that never arrives, the end.
+stop = {}
+for c, (lon, lat, alt, last) in paths.items():
+    stop[c] = float(last)
+    if flights[c]["arrived"]:
+        t = np.linspace(0, 1, 2001)
+        d = km_to_goal(lat[last - 1] + t * (lat[last] - lat[last - 1]), lon[last - 1] + t * (lon[last] - lon[last - 1]))
+        stop[c] = last - 1 + t[np.argmax(d < radius)]
+
 # frame the map on what reaches the goal, padded, and grown to the panel's shape
 xs = np.concatenate([paths[c][0][: paths[c][3] + 1] for c in ("hindsight", "mpc")] + [[goal_lon]])
 ys = np.concatenate([paths[c][1][: paths[c][3] + 1] for c in ("hindsight", "mpc")] + [[goal_lat]])
@@ -82,9 +100,18 @@ where.set_ylim(south, north)
 where.set_aspect(aspect, adjustable="box")
 where.set_axis_off()
 
-ring = np.linspace(0, 2 * np.pi, 160)
+def circle(lat0: float, lon0: float, km: float, n: int = 240) -> tuple[np.ndarray, np.ndarray]:
+    """Points exactly km from (lat0, lon0) on the sphere: the same great-circle distance the arrival rule uses"""
+    bearing, d = np.linspace(0, 2 * np.pi, n), km / 6371
+    p, l = np.radians(lat0), np.radians(lon0)
+    lat = np.arcsin(np.sin(p) * np.cos(d) + np.cos(p) * np.sin(d) * np.cos(bearing))
+    lon = l + np.arctan2(np.sin(bearing) * np.sin(d) * np.cos(p), np.cos(d) - np.sin(p) * np.sin(lat))
+    return np.degrees(lat), np.degrees(lon)
+
+
+ring_lat, ring_lon = circle(goal_lat, goal_lon, radius)
 r_deg = np.degrees(radius / 6371)
-where.plot(goal_lon + r_deg * np.sin(ring) * aspect, goal_lat + r_deg * np.cos(ring), color=GOAL, linewidth=1.8, linestyle=(0, (3, 2)))
+where.plot(ring_lon, ring_lat, color=GOAL, linewidth=1.8, linestyle=(0, (3, 2)))
 where.plot(goal_lon, goal_lat, "*", color=GOAL, markersize=22)
 where.text(goal_lon + r_deg * aspect + 0.4, goal_lat - 0.3, "goal", color=GOAL, fontsize=18, fontweight=600)
 where.plot(start_lon, start_lat, "o", color=INK, markersize=8)
@@ -93,7 +120,7 @@ km_per_deg = 111.2 / aspect
 where.plot([west + 1, west + 1 + 500 / km_per_deg], [south + 0.8] * 2, color=INK, linewidth=2.5)
 where.text(west + 1 + 250 / km_per_deg, south + 1.2, "500 km", color=INK, fontsize=15, ha="center")
 
-total = max(p[3] for p in paths.values())
+total = int(np.ceil(max(stop.values())))
 when.set_xlim(0, total * step)
 when.set_ylim(14.4, 20.6)
 when.set_yticks([15, 20])
@@ -170,7 +197,7 @@ def draw(frame: int) -> None:
     clock.set_text(f"day {int(move * step // 24)}, hour {int(move * step % 24):02d}")
     for c in ORDER:
         lon, lat, alt, last = paths[c]
-        m = min(move, last)
+        m = min(move, stop[c])
         whole = int(np.floor(m))
         x = np.append(lon[: whole + 1], at(lon, m))
         y = np.append(lat[: whole + 1], at(lat, m))
@@ -178,7 +205,12 @@ def draw(frame: int) -> None:
         balloon[c].set_data([x[-1]], [y[-1]])
         climb[c].set_data(np.append(np.arange(whole + 1) * step, m * step), np.append(alt[: whole + 1], at(alt, m)))
         dot[c].set_data([m * step], [at(alt, m)])
-        cost = at(running[c], min(move, moves))
+        # the bar finishes growing at the same moment the balloon stops: its arrival move is squeezed into
+        # the part of that move before the ring crossing
+        b = min(move, moves)
+        if flights[c]["arrived"] and b > last - 1:
+            b = last - 1 + min(1.0, (b - (last - 1)) / (stop[c] - (last - 1)))
+        cost = at(running[c], b)
         bar[c].set_width(cost)
         inside = cost > final["fixed_plan"] * 0.75  # a long bar carries its number inside, in white
         value[c].set_text(f"{cost:,.0f} km")

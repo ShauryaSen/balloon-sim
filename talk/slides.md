@@ -414,9 +414,9 @@ For the first day they all ride the same wind east.
 
 Orange is the fixed plan. It made its whole plan at launch from the model. It stays low the whole flight. The forecast was off, so it drifts past and never comes back. Closest it gets is about 800 km.
 
-Black is hindsight. It turns south at the right time and gets there in about four and a half days.
+Black is hindsight. It turns south at the right time and reaches the ring a little after four days.
 
-Blue is MPC. It starts on a worse route, replans as it goes, loops back, and gets in about six hours after black.
+Blue is MPC. It starts on a worse route, replans as it goes, loops back, and reaches the ring about nine hours after black.
 
 The bars on the right are each one's cost as it flies: distance from the goal, added up over the flight. A bar stops growing when its balloon gets to the goal. At the end: hindsight about 500 km, MPC about 640, the fixed plan about 2,400. In two slides I'll turn those three numbers into one score.
 
