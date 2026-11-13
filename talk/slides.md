@@ -643,30 +643,6 @@ Now results. Across the bottom is forecast error. Up the side is average distanc
 
 ---
 
-# Using the balloon's own wind readings
-
-Correcting the forecast with the balloon's own readings didn't detectably help in any of 24 comparisons.
-
-<div style="width: 560px; margin: 0.6rem auto 0"><Layers name="readings" :n="3" :shown="1" /></div>
-
-<!--
-ROHAN. About 1 minute. TWO CLICKS.
-
-This one surprised us. As the balloon flies it measures the wind where it is, and MPC can use that to correct its forecast. Loon did this. So we ran MPC with that switched on and switched off.
-
-[click] Each dot is one launch: the difference between using the readings and ignoring them. Below zero means the readings helped.
-
-[click] The black diamonds are the averages, and they sit on zero the whole way across. We made 24 of these comparisons, across planning horizons and error levels, and readings didn't detectably help in any of them.
-
-We think it's scale. The balloon gets one reading every three hours along a single line, and the forecast error comes in patches about 500 km wide. One reading just doesn't tell you much about where you're headed next.
-
-So what MPC gains over the fixed plan comes from replanning from where you actually are, not from learning about the wind.
-
-[If asked: same answer on the cost that stops counting once the balloon arrives. The averages are a bit bigger there but still inside the noise.]
--->
-
----
-
 # Planning further ahead stops helping
 
 With a good forecast, looking further ahead helps. With a real one, the lines meet. Past 60 hours never helped.
@@ -676,7 +652,7 @@ With a good forecast, looking further ahead helps. With a real one, the lines me
 <!--
 ROHAN. About 1.5 minutes. FOUR CLICKS, one per line.
 
-This is the result we set out to find. Same axis across the bottom. Up the side is how far MPC is from hindsight, so zero would be perfect.
+First question: how far ahead should MPC plan? This is the result we set out to find. Same axis across the bottom. Up the side is how far MPC is from hindsight, so zero would be perfect.
 
 [click] This is MPC planning 15 hours ahead.
 
@@ -704,7 +680,7 @@ Helps the fixed plan by about 200 km. Does nothing for MPC, at any error level.
 <!--
 ROHAN. About 1 minute. TWO CLICKS.
 
-Last result from the sweep. Normally the planner scores each plan on the one forecast, the mean wind. The alternative is to draw a bunch of possible winds around the forecast and score each plan on its average over all of them. That's the textbook way to plan under uncertainty. Below zero means it helped.
+Next question: what it plans on. Normally the planner scores each plan on the one forecast, the mean wind. The alternative is to draw a bunch of possible winds around the forecast and score each plan on its average over all of them. That's the textbook way to plan under uncertainty. Below zero means it helped.
 
 [click] For the fixed plan it helps, by about 200 km, up to 3.2 metres a second of error. That makes sense. It gets one shot, so a plan that holds up when the forecast is wrong is worth having.
 
@@ -713,6 +689,30 @@ Last result from the sweep. Normally the planner scores each plan on the one for
 We checked whether that's just because our uncertainty happens to be exactly right, by making it twice too wide and twice too narrow. Same answer. MPC fixes its mistakes as they happen, so preparing for them in advance doesn't buy anything.
 
 [If asked: 64 sampled winds for the fixed plan, 16 for MPC. Bars are 95 percent intervals over 32 launches.]
+-->
+
+---
+
+# Using the balloon's own wind readings
+
+Correcting the forecast with the balloon's own readings didn't detectably help in any of 24 comparisons.
+
+<div style="width: 560px; margin: 0.6rem auto 0"><Layers name="readings" :n="3" :shown="1" /></div>
+
+<!--
+ROHAN. About 1 minute. TWO CLICKS.
+
+Last question from the sweep, and this one surprised us. As the balloon flies it measures the wind where it is, and MPC can use that to correct its forecast. Loon did this. So we ran MPC with that switched on and switched off.
+
+[click] Each dot is one launch: the difference between using the readings and ignoring them. Below zero means the readings helped.
+
+[click] The black diamonds are the averages, and they sit on zero the whole way across. We made 24 of these comparisons, across planning horizons and error levels, and readings didn't detectably help in any of them.
+
+We think it's scale. The balloon gets one reading every three hours along a single line, and the forecast error comes in patches about 500 km wide. One reading just doesn't tell you much about where you're headed next.
+
+So what MPC gains over the fixed plan comes from replanning from where you actually are, not from learning about the wind.
+
+[If asked: same answer on the cost that stops counting once the balloon arrives. The averages are a bit bigger there but still inside the noise.]
 -->
 
 ---
