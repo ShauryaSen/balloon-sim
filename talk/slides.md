@@ -740,223 +740,215 @@ First, control handles realistic random error fine. At a real forecast's error M
 </div>
 
 <!--
-SHAURYA takes over. About 15 seconds.
-
-So: which properties of a wind model matter for transfer? This is the fidelity experiment, and it's what we're running next.
+SHAURYA takes over. About 15 seconds. No clicks.
+Rohan showed that control tolerates random error about the size of a real forecast's.
+But random error blurs everything a little. It never removes one thing, so it can't say which properties of a wind model matter.
+This part is the experiment we plan to run next. It's planned, so there are no results here.
+Random error blurs everything. Next: degrade one property at a time.
 -->
 
 ---
 
-# Our hypothesis: the balloon steers on the differences between altitudes
+# Fidelity experiment
 
-<div class="row" style="align-items: stretch; gap: 20px">
-  <div class="card line grow">
-    <Column :winds="[-0.55, -0.8]" colour="#e2852e" />
-    <h3>Two altitudes</h3>
-    <p>cBottle. Nothing could steer.</p>
-  </div>
-  <div class="card line grow" v-click>
-    <Column :winds="[-0.5, -0.38, -0.2, 0.12, -0.3, -0.6]" colour="#0f8a7a" />
-    <h3>Six altitudes</h3>
-    <p>ERA5. Goals downwind are reachable, and nothing else.</p>
-  </div>
-  <div class="col" style="width: 250px; justify-content: center" v-click>
-    <p style="font-size: 21px; font-weight: 650; line-height: 1.3; letter-spacing: -0.01em">So control should suffer from errors in how the wind changes with altitude, not from errors in the wind itself.</p>
-  </div>
-</div>
+Copies of ERA5, each with one property degraded.
+
+<svg viewBox="0 0 884 262" style="width: 100%; display: block; margin-top: 30px">
+  <defs>
+    <clipPath id="fx-r1"><rect x="0" y="24" width="230" height="159" rx="8" /></clipPath>
+    <clipPath id="fx-r2"><rect x="330" y="24" width="230" height="159" rx="8" /></clipPath>
+  </defs>
+  <text x="115" y="14" text-anchor="middle" style="font-size: 15px; font-weight: 600" fill="#1a1a1a">True wind (ERA5)</text>
+  <image href="/fig/split-truth-px.png" x="0" y="24" width="230" height="159" preserveAspectRatio="xMidYMid slice" clip-path="url(#fx-r1)" />
+  <text x="280" y="78" text-anchor="middle" style="font-size: 13px" fill="#888">degrade</text>
+  <text x="280" y="94" text-anchor="middle" style="font-size: 13px" fill="#888">one property</text>
+  <path d="M 242 104 H 316" stroke="#b7bcc6" stroke-width="2.5" />
+  <path d="M 308 97 L 318 104 L 308 111" fill="none" stroke="#b7bcc6" stroke-width="2.5" stroke-linejoin="round" />
+  <text x="445" y="14" text-anchor="middle" style="font-size: 15px; font-weight: 600" fill="#1a1a1a">Degraded copy</text>
+  <image href="/fig/split-coarse-px.png" x="330" y="24" width="230" height="159" preserveAspectRatio="xMidYMid slice" clip-path="url(#fx-r2)" />
+  <text x="445" y="202" text-anchor="middle" style="font-size: 13px" fill="#888">Example: grid 8× coarser, 0.25° → 2°</text>
+  <g v-click="1">
+    <path d="M 572 104 H 646" stroke="#b7bcc6" stroke-width="2.5" />
+    <path d="M 638 97 L 648 104 L 638 111" fill="none" stroke="#b7bcc6" stroke-width="2.5" stroke-linejoin="round" />
+    <text x="772" y="14" text-anchor="middle" style="font-size: 15px; font-weight: 600" fill="#1a1a1a">Controller</text>
+    <rect x="660.75" y="24.75" width="222.5" height="157.5" rx="8" fill="#fff" stroke="#b7bcc6" stroke-width="1.5" />
+    <text x="680" y="60" style="font-size: 18px; font-weight: 600" fill="#1a1a1a">MPC</text>
+    <text x="680" y="82" style="font-size: 14px" fill="#555">plans on the copy</text>
+    <path d="M 772 190 V 238 H 115 V 196" fill="none" stroke="#4f7db3" stroke-width="2.5" stroke-linejoin="round" />
+    <path d="M 108 204 L 115 194 L 122 204" fill="none" stroke="#4f7db3" stroke-width="2.5" stroke-linejoin="round" />
+    <rect x="345" y="227" width="200" height="22" fill="#fff" />
+    <text x="445" y="243" text-anchor="middle" style="font-size: 14px; font-weight: 600" fill="#4f7db3">then flown in the true wind</text>
+  </g>
+  <g v-click="2">
+    <line x1="676" y1="104" x2="868" y2="104" stroke="#e3e3e3" stroke-width="1" />
+    <text x="680" y="139" style="font-size: 18px; font-weight: 600" fill="#1a1a1a">PPO</text>
+    <text x="680" y="161" style="font-size: 14px" fill="#555">trained on the copy</text>
+  </g>
+</svg>
+
+<p v-click="3" style="text-align: center; margin-top: 26px">The drop in score is how much that property matters for transfer.</p>
 
 <!--
-SHAURYA. About 1 minute. TWO CLICKS.
-
-Here's what we expect, and why. Each picture is one column of air, one arrow per altitude.
-
-On the left is cBottle, NVIDIA's global generator. We tried flying on it in October. Near the balloon it has only two altitudes, both blowing hard the same way, and nothing could steer.
-
-[click] ERA5 has six, and a balloon can reach goals downwind but not across the wind or against it. In this record the winds at different altitudes oppose each other at only 58 percent of places.
-
-[click] So here's our hypothesis. A balloon can only use the directions its altitudes offer, so it steers on the differences between altitudes. Control should suffer when a wind model gets those differences wrong, and much less when it gets the wind wrong in a way that leaves them alone.
-Our noise experiment can't test that: its error was always one shape. So next we make the wind model wrong in different ways, one at a time.
+Shaurya, about 1 min. THREE CLICKS.
+Same method as before: build the controller on a wind model, fly it in the real wind. What changes is the model.
+We take ERA5, the true wind, and make copies of it. Each copy has one property degraded and everything else left alone. The example is held-out ERA5 at a quarter degree, the same panel as the poster, and a copy keeping only every 8th grid point, a quarter degree to 2: each block is one kept point, one arrow each. In the experiment the controller sees a straight-line blend between kept points.
+[click] MPC plans on the copy, and the balloon flies in real ERA5. It's the setup Rohan showed, with the copy in place of the noisy forecast.
+[click] Or we train an RL policy, PPO, on the copy, and then test it in real ERA5. So both kinds of controller: one that plans, one that's trained.
+[click] We score it the same way as before. The drop in score from the undegraded case is how much that property matters for transfer.
+Why copies of ERA5 and not a real generator: a real generator gets many things wrong at once, so if the score drops you can't say why. A degraded copy differs from the truth in exactly one way, so a drop has one cause.
+This is planned. Nothing here has been run yet.
+Which properties? Next slide.
+Images: talk/public/fig/split-truth-px.png and split-coarse-px.png, drawn by talk/figures/split_pixels.py.
 -->
 
 ---
 
-# Four properties, each made coarser step by step
+# Candidate properties
 
-<div class="ladders">
-  <div class="name"><strong>Altitude levels</strong><span>18 down to 1</span></div>
-  <img src="/fig/ladder-levels.png" />
-  <div class="name" v-click="1"><strong>Frames in time</strong><span>every 3 h up to frozen</span></div>
-  <img src="/fig/ladder-frames.png" v-click="1" />
-  <div class="name" v-click="2"><strong>Grid</strong><span>2° up to 16°</span></div>
-  <img src="/fig/ladder-grid.png" v-click="2" />
-  <div class="name" v-click="3"><strong>Kind of error</strong><span>at the same size</span></div>
-  <div class="row" style="gap: 8px" v-click="3">
-    <span class="chip">a constant offset</span><span class="muted small">or</span><span class="chip">random</span>
-    <span class="muted small" style="margin: 0 6px">×</span>
-    <span class="chip">the same at every altitude</span><span class="muted small">or</span><span class="chip">different at each</span>
-  </div>
-</div>
+Each one degraded in steps, from ERA5 to very coarse. Not a fixed list.
 
-<div class="cap" style="margin-top: 10px"><span class="dot" style="background: #dfe2e7"></span>true wind&emsp;<span class="dot" style="background: var(--accent)"></span>what the controller is given&emsp;·&emsp;most detailed on the left, coarsest on the right</div>
+<table class="pt">
+  <tr><td>Altitude levels</td><td>18 → 9 → 6 → 3 → 2 → 1</td></tr>
+  <tr><td>Time between frames</td><td>3 h → 6 h → 12 h → 24 h → frozen</td></tr>
+  <tr><td>Grid spacing</td><td>2° → 4° → 8° → 16°</td></tr>
+  <tr><td>Kind of error, same size</td><td>constant or random; same at every altitude or different at each</td></tr>
+</table>
+
+<p v-click class="pt-bet"><b>Expected:</b> altitude levels matter most. The balloon steers on differences between altitudes.</p>
 
 <style>
-.ladders { display: grid; grid-template-columns: 170px 1fr; gap: 10px 18px; align-items: center; }
-.ladders img { width: 100%; height: 84px; object-fit: fill; }
-.ladders .name { display: flex; flex-direction: column; font-size: 17px; line-height: 1.25; }
-.ladders .name span { font-size: 13.5px; color: var(--muted); }
+.pt { width: 100%; margin-top: 1.4rem; border-collapse: collapse; font-size: 1.15rem; }
+.pt td { padding: 0.75rem 0.4rem; border-bottom: 1px solid #e6e8ec; border-top: none; }
+.pt tr:first-child td { border-top: 1px solid #e6e8ec; }
+.pt td:first-child { font-weight: 600; width: 260px; color: #1a1a1a; }
+.pt td:last-child { color: #333; }
+.pt-bet { margin-top: 1.6rem !important; color: #1a1a1a !important; }
+.pt-bet b { font-weight: 600; color: #4f7db3; }
 </style>
 
 <!--
-SHAURYA. About 1.5 minutes. THREE CLICKS, one per row.
-
-These are the properties. In each row, the left is the most detailed and the right is the coarsest. Grey is the true wind, green is what the controller gets.
-
-First, altitude levels. This is the wind up one column of air. We keep fewer and fewer levels and draw straight lines between them. With one level, every altitude has the same wind and there's nothing to steer with. We expect this to matter most.
-
-[click] Second, time. The wind at one place over ten days. We keep a frame every 3 hours, then 12, then 24, then freeze it.
-
-[click] Third, the grid. From 2 degrees up to 16.
-
-[click] And fourth, the kind of error, holding its size fixed. Is the wind off by a constant amount, or randomly? And is the error the same at every altitude, or different at each one?
-
-Each ladder goes from finer than the wind really varies to much coarser. So somewhere along each one, control should start to suffer. Where that happens is the result.
-
-[Task: station keeping, staying near one point, because it's what Loon flew and what the field scores, and Part 4 showed a balloon only reaches goals downwind.]
-[The picture uses our current 6-level record. The real experiment rebuilds the truth at 18 levels first, so the first row will start from 18.]
+Shaurya, about 45 seconds. ONE CLICK.
+Which properties? These are the candidates. None of it is locked.
+The first three are resolution. Altitude levels: keep fewer of them, from all 18 down to one. Time between frames: from every 3 hours to a wind that never changes. Grid spacing: from 2 degrees to 16.
+Each ladder runs from the truth to past the wind's own scale. The wind decorrelates in about 31 hours and about 1,050 km, so somewhere on each ladder the score should drop.
+The fourth is different. The size of the error stays the same and its kind changes: a constant offset or random, the same at every altitude or different at each.
+[click] Our bet is that altitude levels matter most, because the balloon steers on the differences between altitudes.
+The sharpest test of that is in the fourth row. Two errors of the same size, 4.5 m/s. A uniform offset leaves the differences between altitudes unchanged. An offset that grows with altitude changes them by 2.65 m/s. If the bet is right, only the second one hurts.
+Why we expect it: cBottle had two levels near the balloon, both fast, and nothing could steer. And in Part 4 only downwind goals were reachable.
+We'd run each one across several tasks and both kinds of controller.
+Sources: ladders and the 31 h / 1,050 km / 4.5 / 2.65 figures from balloon-sim/docs/fidelity-design-2026-11-06.md.
 -->
 
 ---
 
-# The sharpest test: two errors of the same size
+# Tasks
 
-<div class="pair" style="align-items: stretch">
-  <div class="card">
-    <h3>The same offset at every altitude</h3>
-    <p>Wind error: 4.5 m/s<br>Change in the differences between altitudes: <b>0</b></p>
-    <p class="c-mpc">Hypothesis: barely hurts</p>
+Each degraded copy is tested on three tasks.
+
+<div class="tk">
+  <div><img src="/figures/task-station.png" /><p><b>Station keeping</b><br>stay near one point</p></div>
+  <div><img src="/figures/task-navigation.png" /><p><b>Navigation</b><br>reach waypoints</p></div>
+  <div><img src="/figures/task-distance.png" /><p><b>Distance</b><br>get as far from launch as possible</p></div>
+</div>
+
+<style>
+.tk { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1.6rem; text-align: center; }
+.tk img { height: 200px; width: auto; margin: 0 auto; display: block; }
+.tk p { font-size: 0.95rem !important; line-height: 1.35 !important; margin: 8px 0 0 !important; color: #555 !important; }
+.tk b { color: #1a1a1a; font-size: 1.05rem; }
+</style>
+
+<!--
+Shaurya, about 30 seconds.
+Each degraded copy is tested on three tasks, with both controllers. Station keeping and navigation you saw at the start. The third is distance: get as far from launch as you can.
+A property might matter for one task and not another. Our guess, not a result: station keeping needs winds that oppose each other; distance mostly needs one fast wind.
+None of this is locked. Which task should lead is one of the questions at the end.
+The task pictures are schematic. Figures: talk/figures/tasks.py
+-->
+
+---
+
+# Toward a minimal generator
+
+Each resolution property is a generator setting. Where the score holds, the setting can be coarser.
+
+<table class="pt mg">
+  <tr><th>Generator setting</th><th>Today</th><th>Coarsest that still transfers</th></tr>
+  <tr><td>Altitude levels</td><td>18</td><td class="q">?</td></tr>
+  <tr><td>Time between frames</td><td>1 h</td><td class="q">?</td></tr>
+  <tr><td>Grid spacing</td><td>0.25°</td><td class="q">?</td></tr>
+</table>
+
+<p class="mg-note">The experiment starts from ERA5 at 2° and every 3 h, so it tests coarser than that.</p>
+
+<p v-click class="pt-bet"><b>Result:</b> the cheapest generator that still transfers.</p>
+
+<style>
+.pt { width: 100%; margin-top: 1.4rem; border-collapse: collapse; font-size: 1.15rem; }
+.pt td, .pt th { padding: 0.75rem 0.4rem; border-bottom: 1px solid #e6e8ec; border-top: none; text-align: left; }
+.pt th { font-size: 0.8rem; font-weight: 500; color: #888; text-transform: uppercase; letter-spacing: 0.05em; background: none; }
+.pt td:first-child { font-weight: 600; width: 260px; color: #1a1a1a; }
+.mg td:nth-child(2) { width: 160px; color: #333; }
+.mg td.q { color: #4f7db3; font-weight: 600; }
+.mg-note { font-size: 0.8rem !important; color: #888 !important; margin-top: 0.6rem !important; }
+.pt-bet { margin-top: 1.4rem !important; color: #1a1a1a !important; }
+.pt-bet b { font-weight: 600; color: #4f7db3; }
+</style>
+
+<!--
+Shaurya, about 45 seconds. ONE CLICK.
+Three of the properties are settings of our generator: how many altitude levels it makes, how often it gives a frame, and how fine its grid is. Each one costs compute. Today they're 18 levels, hourly, a quarter degree. We picked those by judgement.
+The experiment fills in the last column: for each setting, the coarsest step where the score still holds.
+One limit: the experiment's truth is ERA5 at 2 degrees and every 3 hours, so it can say how much coarser than that is fine, not anything about finer detail.
+[click] Put the three together and that's the cheapest generator that still transfers.
+If asked about training data: this doesn't measure it. We degrade copies of ERA5, so it tells us about resolution, not how much data a generator needs.
+If asked about kind of error: it isn't a setting, so it's not here. It tells us which mistakes a generator can afford.
+-->
+
+---
+
+# Questions for you
+
+<div class="qs">
+  <div class="q">
+    <div class="q-n">1</div>
+    <div>
+      <p class="q-t">Which other properties would you test?</p>
+      <p class="q-c">So far: altitude levels, time between frames, grid spacing, kind of error.</p>
+    </div>
   </div>
-  <div class="card" v-click>
-    <h3>An offset that changes with altitude</h3>
-    <p>Wind error: 4.5 m/s<br>Change in the differences between altitudes: <b>2.65 m/s</b></p>
-    <p class="c-fixed">Hypothesis: hurts</p>
+  <div class="q">
+    <div class="q-n">2</div>
+    <div>
+      <p class="q-t">Is degraded ERA5 a fair stand-in for a real generator's errors?</p>
+      <p class="q-c">A degraded copy is wrong in one way. A generator is wrong in several ways at once.</p>
+    </div>
   </div>
-</div>
-
-<p v-click style="margin-top: 1.2rem">Across every condition, we'll check which tracks control loss better: the error in the wind, or the error in the differences between altitudes. We wrote this test down before running anything.</p>
-
-<!--
-SHAURYA. About 1 minute. TWO CLICKS.
-
-This is the cleanest test of the hypothesis. Two errors, exactly the same size, 4.5 metres a second.
-On the left, the whole wind is shifted by the same amount at every altitude. The differences between altitudes don't change at all.
-[click] On the right, the shift grows from the bottom of the band to the top. Same size overall, but now the differences between altitudes are off by 2.65.
-If we're right, the left one barely hurts and the right one does.
-[click] And the general version, across every condition in the experiment: does control loss track plain wind error, or the error in the differences between altitudes? It's one pre-registered test, so the many conditions don't multiply false positives. If the second wins, that's a way to score a wind model for control without flying anything.
-Numbers: measured on our 6-level record (docs/fidelity-design-2026-11-06.md). Uniform bias: 4.5 wind error, 0 difference error. Altitude-varying bias of the same size: 2.65.
--->
-
----
-
-# Learned controller (PPO)
-
-<Policy />
-
-<div class="row" style="gap: 10px; margin-top: 14px; justify-content: center" v-click="3">
-  <span class="chip on">64,000 training flights</span>
-  <span class="chip">tested on the same 32 launches as MPC</span>
-  <span class="chip">all 4 tasks</span>
-  <span class="chip">1 balloon and fleets of 4</span>
-</div>
-
-<!--
-SHAURYA. About 1 minute. THREE CLICKS.
-
-Everything so far has been MPC. But we also care about learned controllers: if you train a policy in a simulator, does it work in real wind? So Rohan added PPO to balloon-sim.
-
-On the left is what each balloon sees: the forecast wind at every altitude where it is, plus how far and which way the goal is, how much time is left, what its own wind sensor reads compared to the forecast, and in a fleet, where the other balloons are.
-
-[click] That goes into one policy network, and every balloon in a fleet shares the same network. That's the standard multi-agent setup, MAPPO.
-
-[click] And it outputs climb or sink, every three hours. Same choice MPC makes.
-
-[click] The plan is to train it on 64,000 flights across all the noise levels, on launches separate from the ones we test on, then test it on the same 32 launches as MPC so it goes on the same plots. It's set up on all four tasks: reaching a goal, getting as far from the start as possible, station-keeping, and visiting several targets, with one balloon and with fleets of four.
-
-That's what we're running next.
--->
-
----
-
-# The answers tell us how to build the next generator
-
-<div style="margin: 0 auto"><Arc :current="6" loop /></div>
-
-<div class="row" style="gap: 16px; margin-top: 6px; align-items: stretch">
-  <div class="card grow" v-click><h3 style="font-size: 17px">Levels to generate</h3><p class="small">cBottle: 2. Ours: 18. How many are enough?</p></div>
-  <div class="card grow" v-click><h3 style="font-size: 17px">Frames per day</h3><p class="small">Every hour is expensive. Is every 12 fine?</p></div>
-  <div class="card grow" v-click><h3 style="font-size: 17px">Grid size</h3><p class="small">Fine detail was our biggest realism gap. Does control care?</p></div>
-</div>
-
-<div class="cap" style="margin-top: 14px" v-click><strong style="color: var(--ink)">Wherever control doesn't care, the generator can be coarse, and cheap.</strong> And if the hypothesis holds, "error in the differences between altitudes" becomes a fifth realism check, one that scores a generator for control without flying it.</div>
-
-<!--
-SHAURYA. About 1 minute. FOUR CLICKS.
-
-So this is how it comes back around. We started by building a generator, and the experiment tells us how to build the next one.
-
-Every row on that last slide is something a generator spends compute on.
-
-[click] How many altitude levels to generate. cBottle has two near the balloon, ours has 18. Is the right number 6? 9?
-
-[click] How many frames per day.
-
-[click] And how fine a grid. Fine detail was the biggest gap in our realism scores. If control doesn't care about it, that's a gap we can stop worrying about.
-
-[click] Wherever control doesn't care, the generator can be coarse, and that makes it cheap. And if the hypothesis holds, we'd add a fifth check to the four from Part 2, one that scores a generator on what it's actually for, without flying anything. That closes the loop back to where we started.
--->
-
----
-
-<div class="muted" style="font-size: 16px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 22px">Where we'd like your help</div>
-
-<div class="col" style="gap: 22px; max-width: 820px">
-  <div class="row" style="align-items: baseline; gap: 18px"><div class="big muted" style="font-size: 32px; width: 28px">1</div><p style="font-size: 24px; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em">Is a coarsened copy of ERA5 a fair stand-in for a worse simulator?</p></div>
-  <div class="row" style="align-items: baseline; gap: 18px" v-click><div class="big muted" style="font-size: 32px; width: 28px">2</div><p style="font-size: 24px; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em">Which task should lead: holding a position, or reaching a goal?</p></div>
-  <div class="row" style="align-items: baseline; gap: 18px" v-click><div class="big muted" style="font-size: 32px; width: 28px">3</div><p style="font-size: 24px; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em">What would make a learned controller a fair comparison to MPC here?</p></div>
-</div>
-
-<!--
-BOTH. About 30 seconds, then discussion. TWO CLICKS.
-
-That's where we are. Three things we'd really like your thoughts on.
-
-One. In the next experiment our "worse simulators" are coarsened copies of ERA5. That's what lets us change one thing at a time. Is that convincing, or would you want to see real generators in there?
-
-[click] Two. Everything so far is reaching a goal. The balloon literature mostly does station keeping: stay within 50 kilometres of a point. Which should lead?
-
-[click] Three. For the learned controller: what would you need to see to believe a comparison with MPC is fair?
-
-Thanks. Happy to go back to anything.
--->
-
----
-
-# Backup: why not noise, or just replay ERA5?
-
-<div class="pair" style="text-align: left">
-  <div>
-    <img src="/figures/noise.png" style="max-height: 180px" />
-    <p><b>Noise</b> (simplex, GP, …). You choose its smoothness, but it has no jets, fronts or extremes, and no turning of the wind with altitude.</p>
-  </div>
-  <div>
-    <img src="/figures/intro_pair_era5.png" style="max-height: 180px" />
-    <p><b>ERA5 replay</b> is real, but each day happened once. There's one true wind per forecast and no new weather. It's also what we score on.</p>
+  <div class="q">
+    <div class="q-n">3</div>
+    <div>
+      <p class="q-t">Which task should lead?</p>
+      <p class="q-c">Station keeping, navigating to waypoints, or distance from launch.</p>
+    </div>
   </div>
 </div>
 
+<style>
+.qs { margin-top: 2rem; }
+.q { display: grid; grid-template-columns: 44px 1fr; align-items: start; margin-bottom: 2.2rem; }
+.q-n { font-size: 1.6rem; font-weight: 600; color: #4f7db3; line-height: 1.25; }
+.q-t { font-size: 1.6rem !important; font-weight: 500; color: #1a1a1a !important; line-height: 1.25 !important; margin: 0 !important; }
+.q-c { font-size: 1rem !important; color: #888 !important; margin: 6px 0 0 !important; line-height: 1.4 !important; }
+</style>
+
 <!--
-Backup, only if asked.
-Noise: a GP can even match the real spectrum if you pick its covariance well, but nothing beyond second-order statistics. In BLE, simplex noise is the forecast error and the GP is the controller's wind estimate; neither is the wind itself.
-ERA5: to train or test under uncertainty you want many plausible true winds for one forecast; replay gives exactly one. Replay is fine for scoring a planner, which is what balloon-sim does. Whether extra fidelity matters for control is Part 5.
+Shaurya, about 0.5 min. NO CLICKS. Then 30 min discussion.
+Three things we'd like your input on before we run this.
+One: the properties. We have four so far. What else would you degrade?
+Two: the stand-in. A degraded copy of ERA5 is wrong in one way, which is why a drop in score has one cause. A real generator is wrong in several ways at once. Does what we learn from the copies carry over?
+Three: the tasks. We have station keeping, navigating to waypoints, and getting as far from launch as possible. Which should we run first and report as the main result?
+Leave this slide up for the discussion.
+If the discussion goes to training data: the experiment doesn't measure it; it's about resolution.
 -->
 
 ---
@@ -987,58 +979,4 @@ ERA5: to train or test under uncertainty you want many plausible true winds for 
 Backup. Source: balloon-env-dev/docs/benchmark-reports/benchmark_v2_4yr_250000.md. W1(u|c) and W1(v|c) recomputed from that run's cached samples (the report gives only their mean, 3.52).
 Time rows: balloon-env-dev/docs/benchmark-reports/temporal_4yr_250000.md (run 2026-11-12). BLE's 4.19 / 0.11 reproduce the poster. Ours is new; the poster's 5.46 / 0.20 for "ours" were a toy baseline, and our real spread ratio happens to also be 0.20. Simplex time values are from the 250k report.
 The poster's BLE W1(u|c) 12.71 and W1(v|c) 5.02 have no traceable source; BLE takes no place or time input, so those cells stay n/a.
--->
-
----
-
-# Backup: cBottle as the true wind
-
-<img src="/fig/cbottle-globe.png" class="round" style="width: 100%; height: 330px; object-fit: cover" />
-<div class="row" style="justify-content: flex-end; margin-top: 14px">
-  <div class="small"><span class="chip">coarse global model</span> → <span class="chip">fine patches</span></div>
-</div>
-
-<!--
-ROHAN. About 1 minute. No clicks.
-
-In September we found cBottle, from NVIDIA. It's a generative model of the whole atmosphere, and it's built the way we'd planned to build ours: a coarse global model first, then fine patches on top of it.
-
-This is its wind at about 20 km, from the released model. It looks really good.
-
-So the first question was what to use as the true wind. We wanted a generator there, so the wind never runs out, and cBottle was already global. In October we took the released model and used its wind as the true wind for our balloon.
-
-[The picture: cBottle's wind at 20.6 km, released model, July.]
--->
-
----
-
-# Backup: cBottle gave the balloon nothing to choose between
-
-<div class="row">
-  <div class="grow"><Layers name="levels" :n="2" :shown="1" /></div>
-  <div class="note-side">
-    <p>Slowest wind on offer, at a typical place</p>
-    <div class="big c-fixed" style="margin-top: 14px">8.5 <span style="font-size: 20px">m/s</span></div>
-    <p>cBottle</p>
-    <div v-click="1">
-      <div class="big c-accent" style="margin-top: 18px">3.5 <span style="font-size: 20px">m/s</span></div>
-      <p>ERA5</p>
-    </div>
-  </div>
-</div>
-
-<!--
-ROHAN. About 1 minute. ONE CLICK brings in ERA5.
-
-And it didn't work. Every controller we tried just drifted.
-
-The reason's pretty simple once you see it. cBottle outputs eight pressure levels for the whole atmosphere, and only two of them are anywhere near where a balloon flies, one around 12 km and one around 21. So the balloon has two winds to pick from, and both are fast. At a typical place the slower one is still 8.5 metres a second.
-
-[click] ERA5 has six levels in the same range. With six to pick from there's usually a slow one, around 3.5.
-
-So we switched to ERA5 as the true wind, and everything since uses it.
-
-And notice what happened. cBottle is a very good climate model by general measures, and it was useless for steering, because of how few altitudes it has near the balloon. Keep that in mind; it comes back at the end.
-
-[If asked: 8.5 and 3.5 are the median of the calmest level, 20 to 50 N. Bars are average speeds from our two records.]
 -->
