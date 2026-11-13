@@ -603,8 +603,6 @@ So there's a breaking point, somewhere between 1.6 and 3.2 metres a second.
 
 <p style="font-size: 1.6rem; line-height: 1.4; margin-top: 3rem; color: #1a1a1a">Which specific properties of a wind model matter?</p>
 
-<p style="font-size: 1.25rem; margin-top: 1rem">Random error changes everything a little at once, so it can't separate them.</p>
-
 <!--
 ROHAN. About 30 seconds. No clicks.
 
