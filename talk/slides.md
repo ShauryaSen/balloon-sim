@@ -499,7 +499,6 @@ The pilot is the simplest way to make the wind wrong.
   <li>The balloon flies in the truth, and the controller only sees the forecast.</li>
   <li>Error is a Gaussian process draw (smooth noise), fitted to how much ERA5 wind changes in a day</li>
   <li>Noise levels: 0, 0.8, 1.6, 3.2, 6.4, 12.8 m/s</li>
-  <li>32 launches per level, the same for every controller</li>
 </ul>
 
 <style>
