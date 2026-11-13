@@ -2,6 +2,7 @@
 
   task-station.png     a balloon looping inside a ring around one point
   task-navigation.png  a path across the Pacific through two waypoints
+  task-distance.png    a path that drifts away from its launch, and the straight line back to it
 
 Run from the repo root:  uv run python talk/figures/tasks.py
 """
@@ -73,3 +74,16 @@ ax.plot(*project(*stops[0]), marker="o", color=INK, ms=7, zorder=5)
 for p in stops[1:]:
     ax.add_patch(plt.Circle(project(*p), 0.05, fill=False, color=INK, lw=1.6, zorder=5))
 save(figure, "task-navigation.png")
+
+# distance: launch, a path that drifts away, and the straight line from launch to where it ended up
+figure, ax = globe()
+launch, end = (30.0, 150.0), (22.0, 232.0)
+u = np.linspace(0, 1, 300)
+lat = np.interp(u, [0, 1], [launch[0], end[0]]) + 9 * np.sin(2 * np.pi * 1.25 * u) * np.sin(np.pi * u) ** 0.5
+lon = np.interp(u, [0, 1], [launch[1], end[1]])
+ax.plot(*project(lat, lon), color=RED, lw=2, zorder=4)
+straight_lat, straight_lon = np.linspace(launch[0], lat[-1], 100), np.linspace(launch[1], lon[-1], 100)
+ax.plot(*project(straight_lat, straight_lon), color=INK, lw=1.4, ls=(0, (3, 2)), zorder=3)
+ax.plot(*project(*launch), marker="o", color=INK, ms=7, zorder=5)
+ax.plot(*project(lat[-1], lon[-1]), marker="o", color=RED, ms=5, zorder=5)
+save(figure, "task-distance.png")
