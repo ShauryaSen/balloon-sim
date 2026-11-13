@@ -153,6 +153,52 @@ def draw_breaking() -> None:
     plt.close(figure)
 
 
+def draw_breaking_score() -> None:
+    """The horizon result as the score, (fixed - MPC) / (fixed - hindsight), per horizon. The score is a ratio of
+    means over the launches; bars are 95% bootstrap intervals, resampling launches."""
+    horizons = [5, 10, 20, 50]
+    shades = ["#b9cdf5", "#7fa5ec", MPC, "#143a8a"]
+    fixed = cells("fixed_plan")
+    rng = np.random.default_rng(0)
+    figure, ax = plt.subplots(figsize=(7.0, 4.5))
+    ends = [-0.35, len(SIGMAS) - 0.7]
+    frame = [ax.plot(ends, [100, 100], color=MUTED, linewidth=1, linestyle=(0, (4, 3)))[0],
+             ax.plot(ends, [0, 0], color=MUTED, linewidth=1, linestyle=(0, (4, 3)))[0],
+             ax.text(len(SIGMAS) - 0.6, 100, "hindsight", color=MUTED, va="center", fontsize=11),
+             ax.text(len(SIGMAS) - 0.6, 0, "fixed plan", color=MUTED, va="center", fontsize=11)]
+    layers = [frame]
+    for slot, (horizon, shade) in enumerate(zip(horizons, shades)):
+        mpc = cells("mpc", horizon)
+        means, low, high = [], [], []
+        for sigma in SIGMAS:
+            seeds = sorted(seed for (seed, s) in mpc if s == sigma and (seed, s) in fixed and seed in HIND)
+            f = np.array([fixed[(k, sigma)] for k in seeds])
+            m = np.array([mpc[(k, sigma)] for k in seeds])
+            h = np.array([HIND[k] for k in seeds])
+
+            def score(i):
+                return 100 * (f[i].mean() - m[i].mean()) / (f[i].mean() - h[i].mean())
+
+            means.append(score(np.arange(len(seeds))))
+            boots = [score(rng.integers(0, len(seeds), len(seeds))) for _ in range(2000)]
+            low.append(np.percentile(boots, 2.5))
+            high.append(np.percentile(boots, 97.5))
+        means = np.array(means)
+        bar = ax.errorbar(X + (slot - 1.5) * 0.07, means, yerr=[means - low, np.array(high) - means], color=shade,
+                          marker="o", markersize=7, capsize=0, elinewidth=1.2)
+        label = ax.text(0.30, 0.30 - 0.075 * slot, f"{horizon * 3} hours", color=shade, fontweight=600, transform=ax.transAxes)
+        layers.append([bar.lines[0], *bar.lines[2], label])
+        print(f"  score, horizon {horizon}: " + ", ".join(f"{v:.0f}%" for v in means))
+    layers[1].append(ax.text(0.30, 0.375, "MPC plans ahead", color=MUTED, fontsize=11.5, transform=ax.transAxes))
+    ax.set_ylabel("score (%)")
+    ax.set_ylim(-5, 105)
+    error_axis(ax)
+    ax.set_xlim(-0.35, len(SIGMAS) + 0.2)
+    figure.tight_layout()
+    save_layers(figure, "breaking-score", layers)
+    plt.close(figure)
+
+
 # --- hedging: planning over many possible winds ---------------------------------------------------------------
 
 def draw_hedging() -> None:
@@ -226,5 +272,6 @@ if __name__ == "__main__":
     draw_bounds()
     draw_readings()
     draw_breaking()
+    draw_breaking_score()
     draw_hedging()
     draw_scouting()

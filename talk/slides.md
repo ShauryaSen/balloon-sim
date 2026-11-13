@@ -575,12 +575,17 @@ Okay, results. Forecast error is on the bottom axis. Up the side is distance to 
 
 # Planning further ahead stops helping
 
-<div style="width: 560px; margin: 0.6rem auto 0"><Layers name="breaking" :n="5" :shown="1" /></div>
+<div style="display: flex; gap: 1.2rem; margin-top: 0.6rem">
+  <Layers name="breaking" :n="5" :shown="1" at />
+  <Layers name="breaking-score" :n="5" :shown="1" at />
+</div>
 
 <!--
 ROHAN. About 1.5 minutes. FOUR CLICKS, one per line.
 
 Next is the horizon result. Same axis across the bottom. Up the side is how far MPC is from hindsight, so zero would be perfect.
+
+On the right is the same thing as the score from before: 100 percent is hindsight, zero is the fixed plan.
 
 [click] That's MPC planning 15 hours ahead.
 

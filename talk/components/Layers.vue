@@ -4,9 +4,10 @@
     <Layers name="bounds" :n="5" />              every layer on its own click
     <Layers name="bounds" :n="5" :shown="2" />   the first two layers are there from the start
     <Layers name="realism" :n="1" />             only the first layer, ever
+    <Layers name="a" :n="5" :shown="1" at />     clicks at fixed indices, so two figures on one slide reveal together
 -->
 <script setup lang="ts">
-withDefaults(defineProps<{ name: string; n: number; shown?: number; width?: string }>(), { shown: 0, width: '100%' })
+withDefaults(defineProps<{ name: string; n: number; shown?: number; width?: string; at?: boolean }>(), { shown: 0, width: '100%', at: false })
 </script>
 
 <template>
@@ -14,6 +15,7 @@ withDefaults(defineProps<{ name: string; n: number; shown?: number; width?: stri
     <img :src="`/fig/${name}-0.png`" class="base" />
     <template v-for="i in n" :key="i">
       <img v-if="i <= shown" :src="`/fig/${name}-${i}.png`" class="over" />
+      <img v-else-if="at" v-click="i - shown" :src="`/fig/${name}-${i}.png`" class="over" />
       <img v-else v-click :src="`/fig/${name}-${i}.png`" class="over" />
     </template>
   </div>
