@@ -13,21 +13,9 @@ Shaurya Sen and Rohan Shankar
 
 Dean lab group meeting
 
-<img src="/figures/cover.png" class="cover-strip" />
-<div class="cover-credit">ERA5 wind at 19 km, 16 July 2021</div>
 
 <!--
 Shaurya. Title.
--->
-
----
-
-# Outline
-
-<Sections />
-
-<!--
-Shaurya, 20 seconds. Walk through the five sections in one sentence each.
 -->
 
 ---
@@ -109,7 +97,7 @@ Figure: talk/figures/globe.py
 
 # Our generator
 
-Conditional diffusion, trained on ERA5.
+Conditional diffusion, trained on ERA5. Unbounded in space & time.
 
 <div class="ours">
   <div class="ours-in">
@@ -195,10 +183,10 @@ Two properties that matter for a simulator. Random access: ask for the wind at a
     <p class="caption" style="font-size: 0.75rem !important">Generated wind at about 20 km, 10 July 2023</p>
   </div>
   <ul class="glist">
-    <li>Trained on global data, two layers (coarse and fine)</li>
-    <li>InfiniteDiffusion in time as well as space</li>
-    <li>An equal-area grid on the sphere</li>
-    <li>Trained on global ERA5</li>
+    <li>Two stages: whole globe coarse, then fine detail</li>
+    <li>Fine stage tiles in space, InfiniteDiffusion in time</li>
+    <li>Equal-area grid on the sphere</li>
+    <li>Trained on 2020–2023 ERA5</li>
   </ul>
 </div>
 
@@ -209,7 +197,7 @@ Two properties that matter for a simulator. Random access: ask for the wind at a
 <!--
 Shaurya, 45 seconds.
 That was the summer model. What I'm building now goes further. This is its wind at about 20 km, generated, not ERA5.
-It covers the whole globe in two stages: a coarse model for the whole planet, then a second one that fills in fine detail. It tiles in time too, so a flight never runs out of wind. It works on an equal-area grid on the sphere, and it's trained on global data rather than one region.
+It covers the whole globe in two stages: a coarse model for the whole planet in one pass, then a second one that fills in fine detail by tiling overlapping patches in space. InfiniteDiffusion in time is the plan, so a flight never runs out of wind; the time tiling isn't built yet, and the video is one 13-hour block. Equal-area (HEALPix) grid. Stage 1 trained on ERA5 2020-2023 (~1.8 deg, 6-hourly); Stage 2 on 2022-2023 (~0.23 deg, hourly). Configs: balloon-env-dev/unicorn/configs/stage1_hpx32_ft.yaml, stage2_hpx256_bl.yaml.
 The realism numbers in the next part are for the summer model.
 Video: blog/tools/wind_globe.py, Stage 1 -> Stage 2 output for 2023-07-10, ~53 hPa.
 -->
