@@ -305,32 +305,26 @@ So the question now is not "does it look real" but "is it good for control". Bef
 
 # The method: plan on a model, fly in the real wind
 
-<div class="row center" style="gap: 24px; margin-top: 8px">
-  <div class="col" style="width: 280px">
-    <div class="label">The wind model</div>
-    <img src="/fig/split-forecast.png" class="round" />
-    <div class="cap">The controller plans here.</div>
+Give the controller a model that's missing something, and measure how much worse the balloon does in the real wind.
+
+<div class="pair">
+  <div>
+    <img src="/fig/split-forecast.png" class="round" style="max-height: 250px" />
+    <p class="caption"><b>The wind model</b><br>the controller plans on this</p>
   </div>
-  <div class="op">→</div>
-  <div class="col" style="width: 280px" v-click>
-    <div class="label">The true wind</div>
-    <img src="/fig/split-truth.png" class="round" />
-    <div class="cap">The balloon actually flies here.</div>
+  <div v-click>
+    <img src="/fig/split-truth.png" class="round" style="max-height: 250px" />
+    <p class="caption"><b>The real wind (ERA5)</b><br>the balloon flies in this</p>
   </div>
 </div>
 
-<p v-click style="text-align: center; margin-top: 1.4rem">Give the controller a model that's missing something. If the balloon does much worse in the real wind, that thing mattered.</p>
-
-<p v-click class="caption" style="margin-top: 0.4rem">The real wind is ERA5: real past weather, our stand-in for reality.</p>
-
 <!--
-ROHAN. About 1.5 minutes. THREE CLICKS.
+ROHAN. About 1.5 minutes. ONE CLICK.
 
 Shaurya ended on: what does a wind model need to get right? Here's how we find out.
 A controller never sees the real wind ahead of time. It plans on a wind model. Think of a driver with a map.
-[click] But the balloon moves in the real wind, like the driver drives in the real city.
-[click] So to find out which details a map needs, you give the driver a map with something missing, say the side streets, and see how much later they arrive. Same here. Give the controller a wind model that's missing something, fly the balloon in the real wind, and see how much worse it does. Much worse: that thing mattered. Barely worse: the model can skip it.
-[click] For the real wind we use ERA5, real past weather. It's our stand-in for reality.
+[click] But the balloon moves in the real wind, like the driver drives in the real city. For the real wind we use ERA5, real past weather. It's our stand-in for reality.
+So to find out which details a map needs, you give the driver a map with something missing, say the side streets, and see how much later they arrive. Same here. Give the controller a wind model that's missing something, fly the balloon in the real wind, and see how much worse it does. Much worse: that thing mattered. Barely worse: the model can skip it.
 To say "how much worse", we need something to compare against. That's next.
 -->
 
@@ -338,48 +332,51 @@ To say "how much worse", we need something to compare against. That's next.
 
 # The yardstick: best and worst case
 
-<div class="row" style="justify-content: space-between; padding: 6px 0; border-top: 1.5px solid var(--faint);">
-  <div class="col" style="width: 440px; gap: 4px">
-    <p style="font-size: 24px; font-weight: 650">Hindsight</p>
-    <p style="font-size: 18px">Plans on the true wind.</p>
-  </div>
-  <div style="font-size: 24px">
+Every flight is scored between a best case and a worst case, on the same launches.
+
+<div class="bounds">
+  <div class="bounds-row">
+    <b>Hindsight</b>
+    <span>Plans on the true wind. Nothing can beat it.</span>
+    <div>
 
 $V_{\text{hind}} = \mathbb{E}_w\big[\min_a J(a,w)\big]$
 
 </div>
-</div>
-<div class="row" style="justify-content: space-between; padding: 6px 0; border-top: 1.5px solid var(--faint);" v-click>
-  <div class="col" style="width: 440px; gap: 4px">
-    <p style="font-size: 24px; font-weight: 650" class="c-mpc">Best policy</p>
-    <p style="font-size: 18px">Reacts to where the balloon actually is, for example MPC.</p>
   </div>
-  <div style="font-size: 24px">
+  <div class="bounds-row" v-click>
+    <b class="c-mpc">Best policy</b>
+    <span>Reacts to where the balloon actually is, for example MPC.</span>
+    <div>
 
 $V_{\text{policy}} = \min_\pi \mathbb{E}_w\big[J(\pi,w)\big]$
 
 </div>
-</div>
-<div class="row" style="justify-content: space-between; padding: 6px 0; border-top: 1.5px solid var(--faint); border-bottom: 1.5px solid var(--faint);" v-click>
-  <div class="col" style="width: 440px; gap: 4px">
-    <p style="font-size: 24px; font-weight: 650" class="c-fixed">Fixed plan</p>
-    <p style="font-size: 18px">One plan from the forecast that is made at launch and is never changed.</p>
   </div>
-  <div style="font-size: 24px">
+  <div class="bounds-row" v-click>
+    <b class="c-fixed">Fixed plan</b>
+    <span>One plan made at launch from the forecast, never changed.</span>
+    <div>
 
 $V_{\text{plan}} = \min_a \mathbb{E}_w\big[J(a,w)\big]$
 
 </div>
+  </div>
 </div>
 
-<div style="text-align: center; margin-top: 10px; font-size: 26px" v-click>
+<div v-click style="text-align: center; margin-top: 1.2rem; font-size: 1.5rem">
 
 $V_{\text{hind}} \;\le\; V_{\text{policy}} \;\le\; V_{\text{plan}}$
 
 </div>
 
 <style>
-.slidev-layout p { margin: 2px 0; }
+.bounds { margin-top: 1rem; border-bottom: 1px solid #e3e3e3; }
+.bounds-row { display: grid; grid-template-columns: 150px 1fr 300px; gap: 1rem; align-items: center; padding: 0.5rem 0; border-top: 1px solid #e3e3e3; }
+.bounds-row b { font-size: 1.2rem; font-weight: 600; }
+.bounds-row span { font-size: 1.05rem; color: #333; }
+.bounds-row > div { text-align: right; }
+.bounds-row .katex { font-size: 1.35em; }
 </style>
 
 <!--
@@ -411,7 +408,7 @@ All three use the same planner, the one from Myles's paper. So the only differen
 <!--
 ROHAN. About 1.5 minutes. The film plays by itself, about 10 seconds. Replay it with the controls if you want to talk over it.
 
-Here's one flight with all three, to make it concrete. The task is reaching a goal 2,000 km downwind; Shaurya will say why we picked it. The model here is off by about as much as a real forecast. Three controllers launch from the same spot into the same wind, with the forecast off by 3.2 metres a second. The goal is the red ring. The bottom panel is altitude over time.
+Here's one flight with all three, to make it concrete. The task is reaching a goal 2,000 km downwind; Shaurya will say why we picked it. Three controllers launch from the same spot into the same wind. The model here is the real wind with random error about the size of a real forecast's; more on that in Part 4. The goal is the red ring. The bottom panel is altitude over time.
 
 For the first day they all ride the same wind east.
 
@@ -471,35 +468,33 @@ So now we can measure it. Here's what we'll measure with it.
 
 # The plan: make the real wind worse, one property at a time
 
-<div class="row center" style="gap: 14px">
-  <div class="col" style="width: 250px">
-    <div class="label">True wind</div>
-    <img src="/fig/split-truth.png" class="round" />
-    <div class="cap">The balloon still flies here.</div>
-  </div>
-  <div class="col center" style="width: 200px" v-click="1">
-    <div class="chip teal">coarsen one property</div>
-    <div class="op" style="line-height: 1">→</div>
-  </div>
-  <div class="col" style="width: 250px" v-click="1">
-    <div class="label">A cheaper wind model</div>
+The main experiment. MPC plans on a worse copy of ERA5; the balloon still flies in ERA5.
+
+<div class="side">
+  <div>
     <img src="/fig/split-coarse.png" class="round" />
-    <div class="cap">MPC plans here.</div>
+    <p class="caption">ERA5 on a grid 8× coarser</p>
   </div>
+  <ul>
+    <v-clicks>
+    <li><b>Altitude levels:</b> fewer and fewer</li>
+    <li><b>Grid:</b> coarser and coarser</li>
+    <li><b>Frames in time:</b> further apart</li>
+    <li><b>Kind of error:</b> offset or random, same or different at each altitude</li>
+    </v-clicks>
+  </ul>
 </div>
 
-<div class="center" style="margin-top: 22px; text-align: center" v-click="2">
-  <p style="font-size: 20px"><strong>Same score as before:</strong> how much of the gap to hindsight does MPC close?</p>
-  <p class="small muted" style="margin-top: 6px">If it holds up, that property can be coarse. If it drops, it matters.</p>
-</div>
+<p v-click style="margin-top: 1rem">Same score as before. If it holds up, that property can be coarse. If it drops, it matters.</p>
 
 <!--
-ROHAN. About 1 minute. TWO CLICKS.
+ROHAN. About 1 minute. FIVE CLICKS.
 
-Here's the main experiment we're building toward, the fidelity experiment. The balloon still flies in the real wind.
-[click] But MPC plans on a copy of it with one thing made worse: fewer altitudes, fewer frames a day, a coarser grid, or a different kind of error. On the right is the same wind on a grid eight times coarser. We change one thing at a time, which you can't do with a real generator, because a real generator gets lots of things wrong at once.
+Here's the main experiment we're building toward, the fidelity experiment. I'm saying it up front so you know where this is going. The balloon still flies in the real wind, but MPC plans on a copy of it with one thing made worse. On the left is the same wind on a grid eight times coarser.
+[click] Fewer altitude levels. [click] A coarser grid. [click] Frames further apart in time. [click] Or a different kind of error, at the same size.
+We change one thing at a time, which you can't do with a real generator, because a real generator gets lots of things wrong at once.
 [click] And we score it the same way. If the score holds up, a wind model can be coarse there. If it drops, that property matters.
-The design is locked. Before running it, we ran the simplest version.
+Shaurya will go through these properly at the end. The design is locked. Before running it, we ran the simplest version.
 -->
 
 ---
@@ -521,6 +516,8 @@ Now the first experiment: how much random error control can tolerate.
 
 # First test: make the model randomly wrong
 
+The simplest wrong model: the real wind minus smooth random noise. We choose how big the noise is.
+
 <div class="row center" style="gap: 14px">
   <div class="col" style="width: 240px">
     <div class="label">Truth (ERA5)</div>
@@ -538,10 +535,7 @@ Now the first experiment: how much random error control can tolerate.
   </div>
 </div>
 
-<div class="col" style="gap: 6px; margin-top: 20px; font-size: 17px" v-click="3">
-  <p>• The balloon flies in the truth. The controller only sees the forecast.</p>
-  <p>• The error is smooth random noise, and we choose how big it is. It blurs everything a little.</p>
-</div>
+<p v-click="3" style="text-align: center; margin-top: 1.4rem">The balloon flies in the truth. The controller only sees the forecast.</p>
 
 <!--
 ROHAN. About 1 minute. THREE CLICKS.
@@ -557,39 +551,45 @@ The simplest way for a wind model to be wrong is random error. So for the first 
 
 # Turning up the error, and three questions along the way
 
-<div class="row" style="align-items: stretch; gap: 22px">
-  <div class="card grow">
-    <h3>The dial: how wrong the forecast is</h3>
-    <div class="row" style="gap: 8px; margin-top: 16px; align-items: flex-end">
-      <div v-for="(s, i) in ['0', '0.8', '1.6', '3.2', '6.4', '12.8']" :key="s" class="col center" style="flex: 1">
-        <div :style="{ height: 8 + i * 15 + 'px', width: '100%', borderRadius: '5px', background: i === 3 ? 'var(--ink)' : '#c9ced8' }"></div>
-        <div class="small" :style="{ marginTop: '6px', fontWeight: i === 3 ? 700 : 400 }">{{ s }}</div>
+Six sizes of error. The same 32 launches for every controller, so we compare them launch by launch.
+
+<div class="side" style="grid-template-columns: 1fr 1fr">
+  <div>
+    <div class="dial">
+      <div v-for="(s, i) in ['0', '0.8', '1.6', '3.2', '6.4', '12.8']" :key="s">
+        <div :style="{ height: 14 + i * 26 + 'px', background: i === 3 ? '#1a1a1a' : '#c9ced8' }"></div>
+        <span :style="{ fontWeight: i === 3 ? 700 : 400 }">{{ s }}</span>
       </div>
     </div>
-    <p class="tiny muted" style="margin-top: 6px">m/s. <strong style="color: var(--ink)">3.2 is about what real forecasts miss by.</strong></p>
+    <p class="caption">Error in m/s. <b style="color: #1a1a1a">3.2</b> is about what real forecasts miss by.</p>
   </div>
-  <div class="card grow" v-click>
-    <h3>Three questions about MPC</h3>
-    <p style="margin-top: 12px"><strong>How far ahead it plans</strong><br>15, 30, 60 or 150 hours</p>
-    <p style="margin-top: 10px"><strong>What it plans on</strong><br>one forecast, or many possible winds</p>
-    <p style="margin-top: 10px"><strong>Its own wind readings</strong><br>used, or ignored</p>
-  </div>
+  <ul>
+    <li style="list-style: none; margin-left: -1.2rem"><b>Three questions about MPC</b></li>
+    <v-clicks>
+    <li>How far ahead should it plan? 15, 30, 60 or 150 hours</li>
+    <li>Plan on one forecast, or on many possible winds?</li>
+    <li>Use its own wind readings, or ignore them?</li>
+    </v-clicks>
+  </ul>
 </div>
 
-<div class="row" style="margin-top: 16px; gap: 10px" v-click>
-  <span class="chip on">32 launches</span><span class="small">Every controller flies the same 32, so we compare them launch by launch.</span>
-</div>
+<style>
+.dial { display: flex; gap: 10px; align-items: flex-end; height: 170px; }
+.dial > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.dial > div > div { width: 100%; border-radius: 4px; }
+.dial span { font-size: 0.95rem; }
+</style>
 
 <!--
-ROHAN. About 1.5 minutes. TWO CLICKS.
+ROHAN. About 1.5 minutes. THREE CLICKS.
 
 The dial is the size of that error. Six settings, from a perfect forecast up to four times a real one. The dark bar, 3.2 m/s, is about how much the wind changes in a day, and about what real forecasts miss by when checked against balloons (3.2 to 3.8 m/s, Cadiou et al.). The error is a Gaussian process draw, patches about 540 km across, 1.3 km in altitude, 9 hours in time.
-
-[click] Then three questions about how MPC copes, each a switch. How far ahead it plans, from 15 hours to 150. Whether it plans on the single forecast, or on many possible winds drawn around it. And whether it uses the wind the balloon measures as it flies, or ignores it.
-
-[click] Everything is flown on the same 32 launches. Same start, same goal, same true wind for every controller. So when I show a difference, it's the same flight with one thing changed.
-
-That's about 8,000 flights. Rohan built the pipeline that runs them on the cluster.
+Everything is flown on the same 32 launches. Same start, same goal, same true wind for every controller. So when I show a difference, it's the same flight with one thing changed.
+Along the way we asked three questions about how MPC copes.
+[click] How far ahead it plans, from 15 hours to 150.
+[click] Whether it plans on the single forecast, or on many possible winds drawn around it.
+[click] And whether it uses the wind the balloon measures as it flies, or ignores it.
+That's about 8,000 flights, run on the cluster.
 -->
 
 ---
@@ -732,23 +732,34 @@ Last result from the sweep. Normally the planner scores each plan on the one for
 
 # What the first test told us, and what it couldn't
 
-<div class="pair" style="align-items: stretch">
-  <div class="card">
-    <h3>Learned</h3>
-    <p>Control copes with realistic random error: the score goes from 87% with a perfect model to 77% at a real forecast's error. Replanning is why.</p>
-    <p>The method works: make the model worse and the score drops.</p>
+<div class="pair" style="margin-top: 1.4rem">
+  <div>
+    <h3 class="lh">Learned</h3>
+    <ul>
+      <li>Control tolerates realistic random error: 87% with a perfect model, 77% at a real forecast's error</li>
+      <li v-click="1">The method is sensitive enough: make the model worse and the score drops</li>
+      <li v-click="2">It fixed the controller settings: 60 h ahead, one forecast</li>
+    </ul>
   </div>
-  <div class="card" v-click>
-    <h3>Couldn't tell us</h3>
-    <p>Which properties matter. Random noise blurs everything a little; it never removes one thing. That's what the fidelity experiment is for.</p>
+  <div v-click="3">
+    <h3 class="lh">Couldn't tell us</h3>
+    <ul>
+      <li>Which properties matter. Random noise blurs everything a little; it never removes one thing.</li>
+    </ul>
   </div>
 </div>
 
-<!--
-ROHAN. About 45 seconds. ONE CLICK.
+<style>
+.lh { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.6rem; }
+.pair li { font-size: 1.1rem; margin-bottom: 0.8rem; }
+</style>
 
-So what did the first test tell us? Control copes with realistic random error. With a perfect model MPC closes 87 percent of the gap, and with a real forecast's error it still closes 77. What saves it is replanning. And looking further ahead, hedging and readings add little once the error is realistic, so the main experiment uses MPC at a fixed horizon with none of those switched on.
-It also showed the method works: make the model worse, and the score drops measurably.
+<!--
+ROHAN. About 1 minute. THREE CLICKS.
+
+So what did the first test tell us? Control tolerates realistic random error. With a perfect model MPC closes 87 percent of the gap, and with a real forecast's error it still closes 77. What saves it is replanning.
+[click] The method is sensitive enough: make the model worse, and the score drops measurably, with a clear breaking point.
+[click] And it fixed the controller settings for what comes next. Looking further than 60 hours, hedging and readings add little once the error is realistic, so the main experiment uses MPC at 60 hours on the one forecast.
 [click] What it couldn't tell us is which properties matter. Random noise blurs everything a little. It never takes one thing away. That's the fidelity experiment. Back to Shaurya.
 -->
 
