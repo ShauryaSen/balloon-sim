@@ -298,7 +298,7 @@ But it's random texture: no jets or storms that persist and move, and the same w
 <!--
 ROHAN. About 10 seconds.
 
-First, how we measure whether a wind model is good for control.
+First up, how we measure whether a wind model is any good for control.
 -->
 
 ---
@@ -321,13 +321,13 @@ First, how we measure whether a wind model is good for control.
 <!--
 ROHAN. About 1 minute. TWO CLICKS.
 
-Here's the method for the rest of the talk. ERA5 is the true wind. That's what actually moves the balloon.
+So this is the method for the rest of the talk. ERA5 is the true wind, the one that actually moves the balloon.
 
-[click] We degrade it on purpose, in one way we choose, and give the degraded version to the controller. The controller plans on the degraded wind, but the balloon still flies in ERA5.
+[click] We degrade it on purpose, in one way we pick, and hand the degraded version to the controller. The controller plans on that, but the balloon still flies in ERA5.
 
-[click] Then we measure how much worse the controller does. If degrading something makes control a lot worse, a wind model needs to get that thing right. If it doesn't, it doesn't matter.
+[click] Then we check how much worse the controller does. If degrading something hurts control a lot, the wind model needs to get that thing right. If it doesn't hurt, then it doesn't matter.
 
-To measure "how much worse" we need a number that works for every kind of degrading and every task. That needs a best case and a worst case.
+To measure how much worse, we need one number that works for every kind of degrading and every task. For that we need a best case and a worst case.
 -->
 
 ---
@@ -382,19 +382,19 @@ $V_{\text{hind}} \;\le\; V_{\text{policy}} \;\le\; V_{\text{plan}}$
 <!--
 ROHAN. About 1.5 minutes. THREE CLICKS.
 
-To say how good MPC is, we need something to compare it to. So we have two bounds. J is the cost of a flight, roughly how far from the goal you were. w is the wind, which is uncertain given the forecast.
+To say how good MPC is, we need something to compare it against, so we have two bounds. J is the cost of a flight, roughly how far from the goal you were. w is the wind, which is uncertain given the forecast.
 
-Hindsight: for each wind, take the best plan for that wind, then average. That's knowing the true wind ahead of time. Nobody can do that, so nothing beats it.
+The first bound is hindsight. For each wind, you take the best plan for that wind, then average. Nobody can actually do that, so it's the ceiling.
 
 [click] The best policy reacts to where the balloon actually is. MPC is one policy. It replans every move from where the balloon actually is, so it sits at or above the best policy.
 
-[click] Fixed plan: one plan, picked at launch from the forecast, and it has to work for every wind. No feedback.
+[click] Then the fixed plan. It's one plan, picked at launch from the forecast, and it has to work for every wind. No feedback.
 
-[click] Reacting can only help compared to a fixed plan, and it can't beat knowing the wind. So hindsight ≤ best policy ≤ fixed plan. What we care about is how close to hindsight MPC gets.
+[click] Reacting can only help compared to a fixed plan, and it can't beat knowing the wind. So hindsight ≤ best policy ≤ fixed plan. What we care about is how close MPC gets to hindsight.
 
-All three use the same planner, the one from Myles's paper. So the only differences are what they know and when they plan. Here's what that looks like on one flight.
+All three use the same planner, the one from Myles's paper, so the only differences are what they know and when they plan. Next, one flight with all three.
 
-[If asked: in practice hindsight is the best plan our search found on the true wind, not a proven optimum. The fixed plan plans on the forecast's mean, or on sampled winds when we hedge.]
+[If asked: hindsight is really the best plan our search found on the true wind, not a proven optimum. The fixed plan plans on the forecast mean, or on sampled winds when we hedge.]
 -->
 
 ---
@@ -406,15 +406,15 @@ All three use the same planner, the one from Myles's paper. So the only differen
 <!--
 ROHAN. About 1 minute. TWO CLICKS.
 
-Before the example flight, here's how we picked the task. We didn't want one that flattered us. So we wrote down a rule first, then tested twenty candidates: four directions, five distances.
+Before the example flight, I'll say how we picked the task. We didn't want one that flattered us, so we wrote down a rule first and then tested twenty candidates, four directions and five distances.
 
-On the left: how often does even hindsight reach the goal? If the best possible controller can't get there, the task is too hard to learn anything from. Upwind, crosswind and random goals all fail. Only downwind is reachable.
+On the left is how often even hindsight reaches the goal. If the best possible controller can't get there, the task is too hard to learn anything from. Upwind, crosswind and random goals all fail. Only downwind goals are reachable.
 
-[click] On the right: does steering matter? If a blind plan does nearly as well as hindsight, the wind is doing all the work. Close downwind goals fail that.
+[click] On the right is whether steering matters at all. If a blind plan does nearly as well as hindsight, the wind is doing all the work. Close downwind goals fail that check.
 
-[click] One task passes both. 2,000 kilometres downwind. That's the task in the example flight and in everything after.
+[click] One task passes both, 2,000 kilometres downwind. That's the task in the example flight and everything after it.
 
-But notice what this says by itself: in this wind, a balloon goes downwind or nowhere.
+But notice what this says by itself. In this wind, a balloon basically goes downwind or nowhere.
 -->
 
 ---
@@ -428,19 +428,19 @@ But notice what this says by itself: in this wind, a balloon goes downwind or no
 <!--
 ROHAN. About 1.5 minutes. The film plays by itself, about 10 seconds. Replay it with the controls if you want to talk over it.
 
-Here's one flight with all three, to make it concrete. They launch from the same spot into the same wind. The controllers' wind here has random error added, about as wrong as using yesterday's wind. More on that in a minute. The goal is the red ring. The bottom panel is altitude over time.
+One flight with all three, to make it concrete. They all launch from the same spot into the same wind. The controllers' wind here has random error added, about as wrong as using yesterday's wind. More on that in a minute. The goal is the red ring. The bottom panel is altitude over time.
 
 For the first day they all ride the same wind east.
 
-Orange, the fixed plan, made its whole plan at launch from the forecast. It stays low the whole flight. The forecast was off, so it drifts past and never comes back. Closest it gets is about 800 km.
+Orange is the fixed plan. It made its whole plan at launch from the forecast, and it stays low the whole flight. The forecast was off, so it drifts past the goal and never comes back. The closest it gets is about 800 km.
 
-Black, hindsight, turns south at the right time and gets there a little after four days.
+Black is hindsight. It turns south at the right time and gets there a little after four days.
 
-Blue, MPC, starts on a worse route, replans as it goes, loops back, and gets in about nine hours after black.
+Blue is MPC. It starts on a worse route, replans as it goes, loops back, and gets in about nine hours after black.
 
-The bars on the right are each one's cost as it flies: distance from the goal, added up over the flight. A bar stops growing when its balloon gets to the goal. At the end: hindsight about 500 km, MPC about 640, the fixed plan about 2,400. Next slide turns those three numbers into one score.
+The bars on the right are each one's cost as it flies, which is distance from the goal added up over the flight. A bar stops growing once its balloon reaches the goal. At the end, hindsight is about 500 km, MPC about 640, and the fixed plan about 2,400. The next slide turns those three numbers into one score.
 
-[If asked: these bars use the cost the controllers are planned on, which stops counting at arrival. The averages on the score slide count all 50 moves. On this flight both give a score of 92 percent.]
+[If asked: the bars use the cost the controllers plan on, which stops counting at arrival. The averages on the score slide count all 50 moves. On this flight both give a score of 92 percent.]
 
 [Launch 13 of the 32, from the 2026-10-24 sweep.]
 -->
@@ -473,17 +473,17 @@ $\text{score} = \dfrac{\textcolor{#e2852e}{\text{fixed}} - \textcolor{#2f6fde}{\
 <!--
 ROHAN. About 1.5 minutes. ONE CLICK.
 
-So that gives us a ruler. For every flight we have a worst case, the fixed plan, and a best case, hindsight. The score is how much of the gap between them MPC closes. Distance here is average distance from the goal over the flight.
+So that gives us a ruler. For every flight we have a worst case, which is the fixed plan, and a best case, which is hindsight. The score is how much of the gap between them MPC closes. Distance here means average distance from the goal over the flight.
 
-On the example flight we just watched: fixed plan about 2,400 km, hindsight about 500, MPC about 640. So MPC closed 92 percent of the gap.
+On the example flight we just watched, the fixed plan was about 2,400 km, hindsight about 500, and MPC about 640. So MPC closed 92 percent of the gap.
 
-[click] Over all 32 launches, at 3.2 metres a second: fixed plan about 1,800 km, hindsight about 1,000, MPC about 1,200. That's 77 percent. The rest is what the wrong forecast cost us.
+[click] Over all 32 launches, at 3.2 metres a second, the fixed plan is about 1,800 km, hindsight about 1,000, and MPC about 1,200. That's 77 percent. The rest is what the wrong forecast cost us.
 
-Note it isn't 100 percent even with a perfect forecast. With no error it's 87 percent, because the planner only looks 60 hours ahead and hindsight gets to plan the whole flight.
+It also isn't 100 percent with a perfect forecast. With no error it's 87 percent, because the planner only looks 60 hours ahead while hindsight gets to plan the whole flight.
 
 This is the number that lets us compare across conditions. If we make the wind model worse in some way and the score drops, that property mattered. If it doesn't drop, it didn't.
 
-[Numbers: averages over the same 32 launches, MPC planning 60 hours ahead on the forecast's mean. Scored launch by launch, the median at 3.2 is 80 percent.]
+[Numbers: these are averages over the same 32 launches, with MPC planning 60 hours ahead on the forecast mean. Scored launch by launch, the median at 3.2 is 80 percent.]
 -->
 
 ---
@@ -510,11 +510,11 @@ Make ERA5 worse **one property at a time** and observe the change in performance
 <!--
 ROHAN. About 45 seconds. FOUR CLICKS.
 
-So here's the main experiment, up front. We make ERA5 worse one property at a time and look at how the score changes.
+So, the main experiment, up front. We make ERA5 worse one property at a time and see how the score changes.
 
 [click] Fewer altitude levels. [click] A coarser grid. [click] Frames further apart in time. [click] And the kind of error, at the same size.
 
-Shaurya will go through these in detail at the end. Before that, we ran a pilot with the simplest way to make the wind wrong: random error.
+Shaurya goes through these in detail at the end. Before that, we ran a pilot using the simplest way to make the wind wrong, which is random error.
 -->
 
 ---
@@ -529,7 +529,7 @@ Shaurya will go through these in detail at the end. Before that, we ran a pilot 
 <!--
 ROHAN. About 10 seconds.
 
-The pilot: the simplest way to make the wind wrong.
+The pilot is the simplest way to make the wind wrong.
 -->
 
 ---
@@ -567,13 +567,13 @@ ul li { font-size: 1.05rem; margin-bottom: 0.3rem; }
 <!--
 ROHAN. About 1.5 minutes. THREE CLICKS.
 
-Here's the pilot. The truth is ERA5, same as before. That's the wind that actually moves the balloon.
+The truth is ERA5, same as before. That's the wind that actually moves the balloon.
 
-[click] We take the truth and subtract an error. The error is smooth random noise, a draw from a Gaussian process. We fitted it to how much ERA5's wind changes over a day, so at full size it's like using yesterday's wind as the forecast. And we pick how big it is.
+[click] We take the truth and subtract an error. The error is smooth random noise, a draw from a Gaussian process. We fitted it to how much ERA5's wind changes over a day, so at full size it's like using yesterday's wind as the forecast. We pick how big it is.
 
-[click] What's left is the forecast. The controller only ever sees the forecast.
+[click] What's left is the forecast, and the controller only ever sees that.
 
-[click] We test six noise levels, from zero, which is a perfect forecast, up to 12.8 metres a second. 3.2 is the yesterday's-wind level. A real weather forecast is probably more accurate than that. At each level we fly the same 32 launches with every controller, so when we compare two controllers it's the same flights.
+[click] We test six noise levels, from zero, which is a perfect forecast, up to 12.8 metres a second. 3.2 is the yesterday's-wind level. A real forecast is probably more accurate than that. At each level we fly the same 32 launches with every controller, so when we compare two controllers, it's the same flights.
 
 [If asked: Gaussian process with a Matérn kernel. Patches about 540 km across, 1.3 km in altitude, 9 hours in time.]
 -->
@@ -604,9 +604,9 @@ Here's the pilot. The truth is ERA5, same as before. That's the wind that actual
 <!--
 ROHAN. About 1 minute. ONE CLICK.
 
-In the pilot we vary how wrong the forecast is. Six levels, from a perfect forecast up to four times a real one. 3.2 is about what real forecasts miss by when checked against balloons (3.2 to 3.8 m/s, Cadiou et al.).
+In the pilot we vary how wrong the forecast is. Six levels, from a perfect forecast up to four times a real one. 3.2 is about what real forecasts miss by when you check them against balloons (3.2 to 3.8 m/s, Cadiou et al.).
 
-[click] We also vary three settings of MPC. How far ahead it plans, from 15 hours to 150. Whether it plans on one forecast, or on many draws from its belief about the wind. And whether it uses the wind readings the balloon takes as it flies, or not.
+[click] We also vary three MPC settings. One is how far ahead it plans, from 15 hours to 150. Another is whether it plans on one forecast or on many draws from its belief about the wind. The last is whether it uses the wind readings the balloon takes as it flies, or not.
 
 Every controller flies the same 32 launches, so a difference is always the same flight with one thing changed. That's about 8,000 flights, run on the cluster.
 -->
@@ -620,15 +620,15 @@ Every controller flies the same 32 launches, so a difference is always the same 
 <!--
 ROHAN. About 1.5 minutes. THREE CLICKS.
 
-Now results. Across the bottom is forecast error. Up the side is average distance from the goal, so lower is better. Hindsight is the flat black line, because it never sees the forecast.
+Okay, results. Forecast error is on the bottom axis. Up the side is average distance from the goal, so lower is better. Hindsight is the flat black line, since it never sees the forecast.
 
-[click] The fixed plan. It gets worse as the forecast gets worse, as you'd expect.
+[click] The fixed plan. It gets worse as the forecast gets worse, which is what you'd expect.
 
-[click] And MPC. Much lower, and it stays close to hindsight until the forecast is quite bad.
+[click] And MPC. It's much lower, and it stays close to hindsight until the forecast is pretty bad.
 
-[click] The gap between orange and blue is what replanning is worth, since that's the only difference between them. With a real forecast it's about 570 kilometres closer to the goal, on average over the flight. And it's 330 even with a perfect forecast.
+[click] The gap between orange and blue is what replanning is worth, since that's the only difference between them. With a real forecast, it gets you about 570 kilometres closer to the goal, on average over the flight. Even with a perfect forecast it's still 330.
 
-[If asked why it helps with a perfect forecast: this is distance over the whole flight. The fixed plan gets to the goal and then drifts away. MPC stays. Intervals: 569 plus or minus 201, 327 plus or minus 158.]
+[If asked why it helps with a perfect forecast: this is distance over the whole flight. The fixed plan reaches the goal and then drifts away. MPC stays. Intervals: 569 plus or minus 201, 327 plus or minus 158.]
 -->
 
 ---
@@ -640,19 +640,19 @@ Now results. Across the bottom is forecast error. Up the side is average distanc
 <!--
 ROHAN. About 1.5 minutes. FOUR CLICKS, one per line.
 
-This is the result we set out to find. Same axis across the bottom. Up the side is how far MPC is from hindsight, so zero would be perfect.
+Next is the horizon result. Same axis across the bottom. Up the side is how far MPC is from hindsight, so zero would be perfect.
 
-[click] This is MPC planning 15 hours ahead.
+[click] That's MPC planning 15 hours ahead.
 
 [click] 30 hours. Better, when the forecast is good.
 
 [click] 60 hours. Better again.
 
-[click] And 150 hours, the whole flight. On the left side the lines are in order: the further ahead you plan, the closer you get to hindsight.
+[click] And 150 hours, the whole flight. On the left side the lines are in order. The further ahead you plan, the closer you get to hindsight.
 
-But look at the right. By the time the forecast is as wrong as a real one, the lines have come together. Planning further ahead on a wrong forecast doesn't buy you anything. And going past 60 hours never detectably helped, at any error level.
+But on the right, by the time the forecast is as wrong as a real one, the lines have basically merged. Planning further ahead on a bad forecast doesn't really help. Going past 60 hours never detectably helped, at any error level.
 
-So there's a breaking point, and it sits somewhere between half of a real forecast's error and all of it.
+So there's a breaking point, somewhere between half of a real forecast's error and all of it.
 
 [If asked: paired comparisons between neighbouring horizons are detectable up to 1.6 m/s and not from 3.2 on. Bars are 95 percent intervals over 32 launches.]
 -->
@@ -666,13 +666,13 @@ So there's a breaking point, and it sits somewhere between half of a real foreca
 <!--
 ROHAN. About 1 minute. TWO CLICKS.
 
-Next, what MPC plans on. Normally the planner scores each plan on the one forecast, the mean wind. The alternative is to draw a bunch of possible winds around the forecast and score each plan on its average over all of them. That's the textbook way to plan under uncertainty. Below zero means it helped.
+Next is what MPC plans on. Normally the planner scores each plan on the one forecast, the mean wind. The alternative is to draw a bunch of possible winds around the forecast and score each plan on its average over all of them. That's the textbook way to plan under uncertainty. Below zero means it helped.
 
-[click] For the fixed plan it helps, by about 200 km, up to 3.2 metres a second of error. That makes sense. It gets one shot, so a plan that holds up when the forecast is wrong is worth having.
+[click] For the fixed plan it helps, by about 200 km, up to 3.2 metres a second of error. That makes sense, since it only gets one shot. So a plan that holds up when the forecast is wrong is worth having.
 
 [click] For MPC it does nothing, at any error level.
 
-We checked whether that's just because our uncertainty happens to be exactly right, by making it twice too wide and twice too narrow. Same answer. MPC fixes its mistakes as they happen, so preparing for them in advance doesn't buy anything.
+We checked whether that's just because our uncertainty happens to be exactly right, by making it twice too wide and twice too narrow. Same answer. MPC fixes its mistakes as they happen, so preparing for them ahead of time doesn't help.
 
 [If asked: 64 sampled winds for the fixed plan, 16 for MPC. Bars are 95 percent intervals over 32 launches.]
 -->
@@ -686,15 +686,15 @@ We checked whether that's just because our uncertainty happens to be exactly rig
 <!--
 ROHAN. About 1 minute. TWO CLICKS.
 
-Last result from the sweep, and this one surprised us. As the balloon flies it measures the wind where it is, and MPC can use that to correct its forecast. Loon did this. So we ran MPC with that switched on and switched off.
+The last result from the sweep surprised us a bit. As the balloon flies it measures the wind where it is, and MPC can use that to correct its forecast. Loon did this. So we ran MPC with that on and with it off.
 
-[click] Each dot is one launch: the difference between using the readings and ignoring them. Below zero means the readings helped.
+[click] Each dot is one launch, showing the difference between using the readings and ignoring them. Below zero means the readings helped.
 
-[click] The black diamonds are the averages, and they sit on zero the whole way across. We made 24 of these comparisons, across planning horizons and error levels, and readings didn't detectably help in any of them.
+[click] The black diamonds are the averages, and they sit on zero the whole way across. We made 24 of these comparisons, across planning horizons and error levels. Readings didn't detectably help in any of them.
 
-We think it's scale. The balloon gets one reading every three hours along a single line, and the forecast error comes in patches about 500 km wide. One reading just doesn't tell you much about where you're headed next.
+We think it's a scale thing. The balloon gets one reading every three hours along a single line, and the forecast error comes in patches about 500 km wide. One reading doesn't tell you much about where you're headed next.
 
-So what MPC gains over the fixed plan comes from replanning from where you actually are, not from learning about the wind.
+So the gain over the fixed plan comes from replanning from where you actually are. It doesn't come from learning about the wind.
 
 [If asked: same answer on the cost that stops counting once the balloon arrives. The averages are a bit bigger there but still inside the noise.]
 -->
@@ -721,13 +721,13 @@ ROHAN. About 1 minute. THREE CLICKS.
 
 So, preliminary results.
 
-First, control tolerates realistic random error. At a real forecast's error MPC still closes 77 percent of the gap, against 87 with a perfect forecast.
+First, control handles realistic random error fine. At a real forecast's error MPC still closes 77 percent of the gap, versus 87 with a perfect forecast.
 
-[click] Second, the method works. The score moves when the wind gets worse, and there's a clear breaking point. So it's sensitive enough to use on the real question.
+[click] Second, the method works. The score moves when the wind gets worse, and there's a clear breaking point. So it's sensitive enough for the real question.
 
-[click] Third, it settled the MPC settings for everything after. Plan 60 hours ahead, since further never helped. Plan on the one forecast, since hedging didn't help MPC. And readings didn't matter either way.
+[click] Third, it settled the MPC settings for everything after. Plan 60 hours ahead, since going further never helped. Plan on the one forecast, since hedging didn't help MPC. And readings didn't matter either way.
 
-[click] The question that's left is which properties of a wind model matter. Random error makes everything a bit wrong at once, so it can't pull them apart. That's what the main experiment is for. Back to Shaurya.
+[click] What's left is which properties of a wind model matter. Random error makes everything a bit wrong at once, so it can't pull them apart. That's what the main experiment is for. Back to Shaurya.
 -->
 
 ---
