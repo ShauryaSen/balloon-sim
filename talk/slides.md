@@ -303,29 +303,29 @@ So the question now is not "does it look real" but "is it good for control". Bef
 
 ---
 
-# The method: plan on a model, fly in the real wind
+# Degrade the truth, measure the drop
 
-Give the controller a model that's missing something, and measure how much worse the balloon does in the real wind.
+Give the controller a degraded copy of ERA5, fly the balloon in ERA5, and see how much worse it does.
 
 <div class="pair">
   <div>
-    <img src="/fig/split-forecast.png" class="round" style="max-height: 250px" />
-    <p class="caption"><b>The wind model</b><br>the controller plans on this</p>
+    <img src="/fig/split-truth.png" class="round" style="max-height: 250px" />
+    <p class="caption"><b>ERA5</b><br>the balloon flies in this</p>
   </div>
   <div v-click>
-    <img src="/fig/split-truth.png" class="round" style="max-height: 250px" />
-    <p class="caption"><b>The real wind (ERA5)</b><br>the balloon flies in this</p>
+    <img src="/fig/split-coarse.png" class="round" style="max-height: 250px" />
+    <p class="caption"><b>Degraded ERA5</b><br>the controller plans on this</p>
   </div>
 </div>
 
 <!--
-ROHAN. About 1.5 minutes. ONE CLICK.
+ROHAN. About 1 minute. ONE CLICK.
 
 Shaurya ended on: what does a wind model need to get right? Here's how we find out.
-A controller never sees the real wind ahead of time. It plans on a wind model. Think of a driver with a map.
-[click] But the balloon moves in the real wind, like the driver drives in the real city. For the real wind we use ERA5, real past weather. It's our stand-in for reality.
-So to find out which details a map needs, you give the driver a map with something missing, say the side streets, and see how much later they arrive. Same here. Give the controller a wind model that's missing something, fly the balloon in the real wind, and see how much worse it does. Much worse: that thing mattered. Barely worse: the model can skip it.
-To say "how much worse", we need something to compare against. That's next.
+ERA5 is the true wind. It's real past weather, our stand-in for reality, and it's what actually moves the balloon.
+[click] We degrade it on purpose, in one way we choose, and give the degraded version to the controller. The controller plans on the degraded wind, but the balloon still flies in ERA5.
+Then we measure how much worse the controller does. If degrading something makes control a lot worse, a wind model needs to get that thing right. If it doesn't, it can skip it.
+To say "how much worse", we need a number that works for every kind of degrading and every task. That needs a best case and a worst case.
 -->
 
 ---
@@ -616,14 +616,9 @@ But notice what this says by itself: in this wind, a balloon goes downwind or no
 
 # Replanning is worth a lot
 
-<div class="row">
-  <div class="grow"><Layers name="bounds" :n="5" :shown="2" /></div>
-  <div class="note-side" v-click="3">
-    <div class="big c-mpc">570 <span style="font-size: 20px">km</span></div>
-    <p style="margin-top: 6px">closer to the goal on average, with a real forecast.</p>
-    <p class="small muted" style="margin-top: 10px">330 km even with a perfect one.</p>
-  </div>
-</div>
+At a real forecast's error, MPC is 570 km closer to the goal than the fixed plan, on average over a flight.
+
+<div style="width: 560px; margin: 0.6rem auto 0"><Layers name="bounds" :n="5" :shown="2" /></div>
 
 <!--
 ROHAN. About 1.5 minutes. THREE CLICKS.
@@ -643,14 +638,9 @@ Now results. Across the bottom is forecast error. Up the side is average distanc
 
 # Using the balloon's own wind readings
 
-<div class="row">
-  <div class="grow"><Layers name="readings" :n="3" :shown="1" /></div>
-  <div class="note-side" v-click="2">
-    <div class="big">0 <span style="font-size: 20px">of 24</span></div>
-    <p style="margin-top: 6px">comparisons where readings detectably helped</p>
-    <p style="margin-top: 10px">(4 horizons × 6 noise levels)</p>
-  </div>
-</div>
+Correcting the forecast with the balloon's own readings didn't detectably help in any of 24 comparisons.
+
+<div style="width: 560px; margin: 0.6rem auto 0"><Layers name="readings" :n="3" :shown="1" /></div>
 
 <!--
 ROHAN. About 1 minute. TWO CLICKS.
@@ -670,19 +660,14 @@ So what MPC gains over the fixed plan comes from replanning from where you actua
 
 ---
 
-# Once the forecast is as bad as a real one, planning further ahead stops helping
+# Planning further ahead stops helping
 
-<div class="row">
-  <div class="grow"><Layers name="breaking" :n="5" :shown="1" /></div>
-  <div class="note-side" v-click="5">
-    <p><strong>Good forecast:</strong> looking further ahead gets you closer to hindsight.</p>
-    <p style="margin-top: 12px"><strong>Real forecast or worse:</strong> the lines meet.</p>
-    <p class="small muted" style="margin-top: 12px">Past 60 hours never detectably helped.</p>
-  </div>
-</div>
+With a good forecast, looking further ahead helps. With a real one, the lines meet. Past 60 hours never helped.
+
+<div style="width: 560px; margin: 0.6rem auto 0"><Layers name="breaking" :n="5" :shown="1" /></div>
 
 <!--
-ROHAN. About 1.5 minutes. FIVE CLICKS: four lines, then the takeaway.
+ROHAN. About 1.5 minutes. FOUR CLICKS, one per line.
 
 This is the result we set out to find. Same axis across the bottom. Up the side is how far MPC is from hindsight, so zero would be perfect.
 
@@ -694,7 +679,7 @@ This is the result we set out to find. Same axis across the bottom. Up the side 
 
 [click] And 150 hours, the whole flight. On the left side the lines are in order: the further ahead you plan, the closer you get to hindsight.
 
-[click] But look at the right. By the time the forecast is as wrong as a real one, the lines have come together. Planning further ahead on a wrong forecast doesn't buy you anything. And going past 60 hours never detectably helped, at any error level.
+But look at the right. By the time the forecast is as wrong as a real one, the lines have come together. Planning further ahead on a wrong forecast doesn't buy you anything. And going past 60 hours never detectably helped, at any error level.
 
 So there's a breaking point, and it sits somewhere between half of a real forecast's error and all of it.
 
@@ -705,17 +690,12 @@ So there's a breaking point, and it sits somewhere between half of a real foreca
 
 # Planning on many possible winds
 
-<div class="row">
-  <div class="grow"><Layers name="hedging" :n="3" :shown="1" /></div>
-  <div class="note-side" v-click="3">
-    <p><strong class="c-fixed">Fixed plan:</strong> ~200 km better, up to 3.2 m/s error</p>
-    <p style="margin-top: 12px"><strong class="c-mpc">MPC:</strong> no difference at any noise level</p>
-    <p style="margin-top: 12px">Same with the belief 2× too wide or 2× too narrow</p>
-  </div>
-</div>
+Helps the fixed plan by about 200 km. Does nothing for MPC, at any error level.
+
+<div style="width: 560px; margin: 0.6rem auto 0"><Layers name="hedging" :n="3" :shown="1" /></div>
 
 <!--
-ROHAN. About 1 minute. THREE CLICKS.
+ROHAN. About 1 minute. TWO CLICKS.
 
 Last result from the sweep. Normally the planner scores each plan on the one forecast, the mean wind. The alternative is to draw a bunch of possible winds around the forecast and score each plan on its average over all of them. That's the textbook way to plan under uncertainty. Below zero means it helped.
 
@@ -723,7 +703,7 @@ Last result from the sweep. Normally the planner scores each plan on the one for
 
 [click] For MPC it does nothing, at any error level.
 
-[click] We checked whether that's just because our uncertainty happens to be exactly right, by making it twice too wide and twice too narrow. Same answer. MPC fixes its mistakes as they happen, so preparing for them in advance doesn't buy anything.
+We checked whether that's just because our uncertainty happens to be exactly right, by making it twice too wide and twice too narrow. Same answer. MPC fixes its mistakes as they happen, so preparing for them in advance doesn't buy anything.
 
 [If asked: 64 sampled winds for the fixed plan, 16 for MPC. Bars are 95 percent intervals over 32 launches.]
 -->
