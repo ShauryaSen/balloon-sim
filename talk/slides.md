@@ -303,7 +303,7 @@ First, how we measure whether a wind model is good for control.
 
 ---
 
-# Degrade the truth, measure the drop
+# Make the wind worse, measure how performance changes
 
 <div class="pair" style="align-items: center">
   <div>
@@ -399,6 +399,28 @@ All three use the same planner, the one from Myles's paper. So the only differen
 
 ---
 
+# Choosing the task: only goals downwind are reachable
+
+We scored twenty candidate tasks against a rule written down beforehand. One passed.
+
+<div style="width: 760px; margin: 0.6rem auto 0"><Layers name="scouting" :n="3" :shown="1" /></div>
+
+<!--
+ROHAN. About 1 minute. TWO CLICKS.
+
+Before the example flight, here's how we picked the task. We didn't want one that flattered us. So we wrote down a rule first, then tested twenty candidates: four directions, five distances.
+
+On the left: how often does even hindsight reach the goal? If the best possible controller can't get there, the task is too hard to learn anything from. Upwind, crosswind and random goals all fail. Only downwind is reachable.
+
+[click] On the right: does steering matter? If a blind plan does nearly as well as hindsight, the wind is doing all the work. Close downwind goals fail that.
+
+[click] One task passes both. 2,000 kilometres downwind. That's the task in the example flight and in everything after.
+
+But notice what this says by itself: in this wind, a balloon goes downwind or nowhere.
+-->
+
+---
+
 # Example flight to a goal 2,000 km downwind
 
 <SlidevVideo autoplay controls style="height: 418px; margin: 0 auto; border-radius: 8px" poster="/fig/flight-s13.png">
@@ -468,37 +490,33 @@ This is the number that lets us compare across conditions. If we make the wind m
 
 ---
 
-# The main experiment
+# Main experiment
 
-Make ERA5 worse **one property at a time** and see which ones hurt.
+Make ERA5 worse **one property at a time** and observe the change in performance.
 
 <div class="side">
   <div>
     <img src="/fig/split-coarse.png" class="round" />
-    <p class="caption">ERA5 on a grid 8× coarser</p>
   </div>
   <ul>
     <v-clicks>
-    <li><b>Altitude levels:</b> fewer and fewer</li>
-    <li><b>Grid:</b> coarser and coarser</li>
-    <li><b>Frames in time:</b> further apart</li>
+    <li><b>Altitude levels:</b> decreasing the number</li>
+    <li><b>Grid:</b> making it coarser (lower resolution)</li>
+    <li><b>Frames in time:</b> spacing them further apart</li>
     <li><b>Kind of error:</b> offset or random, same or different by altitude</li>
     </v-clicks>
   </ul>
 </div>
 
-<p v-click style="margin-top: 1rem"><b>First, a pilot:</b> the simplest wrong model, random error</p>
 
 <!--
-ROHAN. About 45 seconds. FIVE CLICKS.
+ROHAN. About 45 seconds. FOUR CLICKS.
 
-So here's the main experiment, up front. We make ERA5 worse one property at a time and see which ones hurt the score.
+So here's the main experiment, up front. We make ERA5 worse one property at a time and look at how the score changes.
 
 [click] Fewer altitude levels. [click] A coarser grid. [click] Frames further apart in time. [click] And the kind of error, at the same size.
 
-Shaurya will go through these in detail at the end.
-
-[click] But before that we ran a pilot, with the simplest way to make the wind wrong: random error.
+Shaurya will go through these in detail at the end. Before that, we ran a pilot with the simplest way to make the wind wrong: random error.
 -->
 
 ---
@@ -538,7 +556,7 @@ The pilot: the simplest way to make the wind wrong.
 </div>
 
 <ul v-click="3" style="margin-top: 1rem">
-  <li>The balloon flies in the truth. The controller only sees the forecast.</li>
+  <li>The balloon flies in the truth, and the controller only sees the forecast.</li>
   <li>Error is a Gaussian process draw (smooth noise), fitted to how much ERA5 wind changes in a day</li>
   <li>Noise levels: 0, 0.8, 1.6, <b>3.2</b>, 6.4, 12.8 m/s. 3.2 ≈ using yesterday's wind as the forecast</li>
   <li>32 launches per level, the same for every controller</li>
@@ -564,11 +582,11 @@ Here's the pilot. The truth is ERA5, same as before. That's the wind that actual
 
 ---
 
-# The experiment turns one dial and flips three switches
+# Varying the forecast error, and three MPC settings
 
 <div class="side" style="grid-template-columns: 1fr 1fr">
   <div>
-    <p><b>The dial: how wrong the forecast is</b></p>
+    <p><b>How wrong the forecast is</b></p>
     <div class="dial">
       <div v-for="(s, i) in ['0', '0.8', '1.6', '3.2', '6.4', '12.8']" :key="s">
         <div :style="{ height: 14 + i * 26 + 'px', background: i === 3 ? '#1a1a1a' : '#c9ced8' }"></div>
@@ -578,7 +596,7 @@ Here's the pilot. The truth is ERA5, same as before. That's the wind that actual
     <p class="caption">m/s. <b style="color: #1a1a1a">3.2</b> is about what real forecasts miss by.</p>
   </div>
   <div v-click>
-    <p><b>Three switches on MPC</b></p>
+    <p><b>Three MPC settings we also vary</b></p>
     <ul>
       <li><b>How far ahead it plans:</b> 15, 30, 60 or 150 hours</li>
       <li><b>What it plans on:</b> one forecast, or many possible winds</li>
@@ -587,7 +605,6 @@ Here's the pilot. The truth is ERA5, same as before. That's the wind that actual
   </div>
 </div>
 
-<p v-click style="margin-top: 1rem"><b>32 launches.</b> Every controller flies the same 32, so we compare them launch by launch.</p>
 
 <style>
 .dial { display: flex; gap: 10px; align-items: flex-end; height: 170px; margin-top: 0.6rem; }
@@ -597,44 +614,18 @@ Here's the pilot. The truth is ERA5, same as before. That's the wind that actual
 </style>
 
 <!--
-ROHAN. About 1.5 minutes. TWO CLICKS.
+ROHAN. About 1 minute. ONE CLICK.
 
-Here's the experiment. The dial is forecast error. Six settings, from a perfect forecast up to four times a real one. The dark bar, 3.2, is about what real forecasts miss by when checked against balloons (3.2 to 3.8 m/s, Cadiou et al.).
+In the pilot we vary how wrong the forecast is. Six levels, from a perfect forecast up to four times a real one. 3.2 is about what real forecasts miss by when checked against balloons (3.2 to 3.8 m/s, Cadiou et al.).
 
-[click] Then three switches on MPC. How far ahead it plans, from 15 hours to 150. Whether it plans on the single forecast, or on many possible winds drawn around it. And whether it uses the wind the balloon measures as it flies, or ignores it.
+[click] We also vary three settings of MPC. How far ahead it plans, from 15 hours to 150. Whether it plans on the single forecast, or on many possible winds drawn around it. And whether it uses the wind the balloon measures as it flies, or ignores it.
 
-[click] Everything is flown on the same 32 launches. Same start, same goal, same true wind for every controller. So when I show a difference, it's the same flight with one thing changed.
-
-That's about 8,000 flights, run on the cluster.
--->
-
----
-
-# First: only goals downwind are reachable at all
-
-We scored twenty candidate tasks against a rule written down beforehand. One passed.
-
-<div style="width: 760px; margin: 0.6rem auto 0"><Layers name="scouting" :n="3" :shown="1" /></div>
-
-<!--
-ROHAN. About 1 minute. TWO CLICKS.
-
-Before comparing controllers we had to pick a task, and we didn't want to pick one that flattered us. So we wrote down a rule first, then tested twenty candidates: four directions, five distances.
-
-On the left: how often does even hindsight reach the goal? If the best possible controller can't get there, the task is too hard to learn anything from. Upwind, crosswind and random goals all fail. Only downwind is reachable.
-
-[click] On the right: does steering matter? If a blind plan does nearly as well as hindsight, the wind is doing all the work. Close downwind goals fail that.
-
-[click] One task passes both. 2,000 kilometres downwind. That's what everything else here uses.
-
-But notice what this says by itself: in this wind, a balloon goes downwind or nowhere.
+Every controller flies the same 32 launches, so a difference is always the same flight with one thing changed. That's about 8,000 flights, run on the cluster.
 -->
 
 ---
 
 # Replanning is worth a lot
-
-570 km closer to the goal on average, with a real forecast. 330 km even with a perfect one.
 
 <div style="width: 560px; margin: 0.6rem auto 0"><Layers name="bounds" :n="5" :shown="2" /></div>
 
@@ -655,8 +646,6 @@ Now results. Across the bottom is forecast error. Up the side is average distanc
 ---
 
 # Planning further ahead stops helping
-
-Good forecast: looking further ahead gets you closer to hindsight. Real forecast or worse: the lines meet.
 
 <div style="width: 560px; margin: 0.6rem auto 0"><Layers name="breaking" :n="5" :shown="1" /></div>
 
@@ -684,8 +673,6 @@ So there's a breaking point, and it sits somewhere between half of a real foreca
 
 # Planning on many possible winds
 
-Fixed plan: ~200 km better, up to 3.2 m/s error. MPC: no difference at any noise level.
-
 <div style="width: 560px; margin: 0.6rem auto 0"><Layers name="hedging" :n="3" :shown="1" /></div>
 
 <!--
@@ -705,8 +692,6 @@ We checked whether that's just because our uncertainty happens to be exactly rig
 ---
 
 # Using the balloon's own wind readings
-
-0 of 24 comparisons where readings detectably helped (4 horizons × 6 noise levels).
 
 <div style="width: 560px; margin: 0.6rem auto 0"><Layers name="readings" :n="3" :shown="1" /></div>
 
@@ -728,34 +713,33 @@ So what MPC gains over the fixed plan comes from replanning from where you actua
 
 ---
 
-# What the pilot told us
+# Preliminary results
 
-<div class="told">
-  <div class="told-row"><b>Control tolerates realistic random error</b><span>MPC closes 77% of the gap at 3.2 m/s</span></div>
-  <div class="told-row" v-click><b>The method is sensitive enough</b><span>the score moves, with a breaking point</span></div>
-  <div class="told-row" v-click><b>It fixed the controller settings</b><span>60 h ahead, one forecast</span></div>
-  <div class="told-row" v-click><b style="color: #0f8a7a">It can't tell us which properties matter</b><span>random error is wrong in only one way</span></div>
-</div>
+<ul class="prelim">
+  <li>Control tolerates realistic random error: MPC closes 77% of the gap at 3.2 m/s, 87% with a perfect forecast</li>
+  <li v-click="1">The score is sensitive enough to show a drop, with a breaking point around a real forecast's error</li>
+  <li v-click="2">MPC settings for what comes next: plan 60 h ahead, on one forecast</li>
+</ul>
+
+<p v-click="3" style="margin-top: 2rem; font-size: 1.3rem; color: #1a1a1a"><b>Open question:</b> which specific properties matter? Random error changes everything a little at once, so it can't separate them.</p>
 
 <style>
-.told { margin-top: 1.4rem; border-bottom: 1px solid #e3e3e3; }
-.told-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0.8rem 0; border-top: 1px solid #e3e3e3; }
-.told-row b { font-size: 1.3rem; font-weight: 600; }
-.told-row span { font-size: 1.05rem; color: #333; }
+.prelim { margin-top: 1.2rem; }
+.prelim li { font-size: 1.2rem; margin-bottom: 0.9rem; }
 </style>
 
 <!--
 ROHAN. About 1 minute. THREE CLICKS.
 
-So what did the pilot tell us?
+So, preliminary results.
 
-First, control tolerates realistic random error. At yesterday's-wind levels MPC still closes 77 percent of the gap, against 87 with a perfect forecast.
+First, control tolerates realistic random error. At a real forecast's error MPC still closes 77 percent of the gap, against 87 with a perfect forecast.
 
 [click] Second, the method works. The score moves when the wind gets worse, and there's a clear breaking point. So it's sensitive enough to use on the real question.
 
-[click] Third, it fixed the controller settings for everything after. Plan 60 hours ahead, since further never helped. Plan on the one forecast, since hedging didn't help MPC. And readings didn't matter either way.
+[click] Third, it settled the MPC settings for everything after. Plan 60 hours ahead, since further never helped. Plan on the one forecast, since hedging didn't help MPC. And readings didn't matter either way.
 
-[click] But random error can't tell us which properties of a wind model matter. It makes the wind wrong in one particular way. That's what the main experiment is for. Back to Shaurya.
+[click] The question that's left is which properties of a wind model matter. Random error makes everything a bit wrong at once, so it can't pull them apart. That's what the main experiment is for. Back to Shaurya.
 -->
 
 ---
