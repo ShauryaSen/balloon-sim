@@ -154,9 +154,9 @@ for c in ORDER:
     climb[c] = when.plot([], [], color=colour, linewidth=WIDTH[c] * 0.6, solid_joinstyle="round")[0]
     dot[c] = when.plot([], [], "o", color=colour, markersize=8, markeredgecolor="white", markeredgewidth=1.2, zorder=6)[0]
 
-# the running cost: distance from the goal after each move, added up and divided by the 50 moves, so it ends
-# at the flight's average distance. Moves after arrival cost nothing (the episode is over), so a bar stops
-# growing when its balloon reaches the goal. Scaled to end exactly on the row's own cost_km.
+# the running cost: distance from the goal after each move, added up, in km. Moves after arrival cost nothing
+# (the episode is over), so a bar stops growing when its balloon reaches the goal. Scaled to end exactly on the
+# row's own cost_km.
 moves = len(flights["mpc"]["path_lat"])
 running = {}
 for c, r in flights.items():
@@ -166,7 +166,7 @@ for c, r in flights.items():
     if r["arrived"]:
         d[int(r["arrived_move"]):] = 0  # d[i] is after move i + 1, so this keeps moves 1..arrived_move
     cum = np.concatenate([[0.0], np.cumsum(d)])
-    running[c] = cum * (r["cost_km"] / moves) / cum[-1]
+    running[c] = cum * r["cost_km"] / cum[-1]
 final = {c: running[c][-1] for c in ORDER}
 
 tally = figure.add_axes((0.66, 0.43, 0.31, 0.42))
@@ -174,7 +174,7 @@ tally.set_xlim(0, final["fixed_plan"] * 1.02)
 tally.set_ylim(-0.6, 2.9)
 tally.set_axis_off()
 figure.text(0.66, 0.935, "Cost so far", color=INK, fontsize=19, fontweight=650, va="center")
-figure.text(0.66, 0.895, "average distance from the goal", color=INK, fontsize=15, va="center")
+figure.text(0.66, 0.895, "distance to the goal, summed (km)", color=INK, fontsize=15, va="center")
 ROW = {"hindsight": 2, "mpc": 1, "fixed_plan": 0}
 bar, value = {}, {}
 for c in ORDER:
@@ -214,7 +214,8 @@ def draw(frame: int) -> None:
         bar[c].set_width(cost)
         inside = cost > final["fixed_plan"] * 0.75  # a long bar carries its number inside, in white
         value[c].set_text(f"{cost:,.0f} km")
-        value[c].set_position((cost - 40 if inside else cost + 40, ROW[c]))
+        pad = 0.017 * final["fixed_plan"]
+        value[c].set_position((cost - pad if inside else cost + pad, ROW[c]))
         value[c].set_ha("right" if inside else "left")
         value[c].set_color("white" if inside else INK)
 

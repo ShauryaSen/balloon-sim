@@ -438,9 +438,9 @@ Black is hindsight. It turns south at the right time and gets there a little aft
 
 Blue is MPC. It starts on a worse route, replans as it goes, loops back, and gets in about nine hours after black.
 
-The bars on the right are each one's cost as it flies, which is distance from the goal added up over the flight. A bar stops growing once its balloon reaches the goal. At the end, hindsight is about 500 km, MPC about 640, and the fixed plan about 2,400. The next slide turns those three numbers into one score.
+The bars on the right are each one's cost as it flies, which is distance from the goal added up over the flight. A bar stops growing once its balloon reaches the goal. At the end, hindsight is about 25,000 km, MPC about 32,000, and the fixed plan about 119,000. The next slide turns those three numbers into one score.
 
-[If asked: the bars use the cost the controllers plan on, which stops counting at arrival. The averages on the score slide count all 50 moves. On this flight both give a score of 92 percent.]
+[If asked: the bars stop counting when a balloon arrives, which is the cost the controllers plan on. The score slide counts all 50 moves, so hindsight and MPC come out higher there, about 30,000 and 36,000. Both give 92 percent.]
 
 [Launch 13 of the 32, from the 2026-10-24 sweep.]
 -->
@@ -449,7 +449,7 @@ The bars on the right are each one's cost as it flies, which is distance from th
 
 # Scoring MPC
 
-Average distance from the goal over a flight
+Distance to the goal, summed over the flight
 
 <div class="score-eq">
 
@@ -458,11 +458,11 @@ $\text{score} = \dfrac{\textcolor{#e2852e}{\text{fixed}} - \textcolor{#2f6fde}{\
 </div>
 
 <div style="border-top: 1px solid #e3e3e3; padding-top: 6px">
-  <ScoreRow title="Example flight" :fixed="2373" :mpc="644" :hindsight="503" />
+  <ScoreRow title="Example flight" :fixed="118639" :mpc="36487" :hindsight="29690" />
 </div>
 
 <div style="border-top: 1px solid #e3e3e3; border-bottom: 1px solid #e3e3e3; padding-top: 6px" v-click>
-  <ScoreRow title="All 32 launches" :fixed="1778" :mpc="1209" :hindsight="1043" />
+  <ScoreRow title="All 32 launches" :fixed="88911" :mpc="60446" :hindsight="52129" />
 </div>
 
 <style>
@@ -473,11 +473,11 @@ $\text{score} = \dfrac{\textcolor{#e2852e}{\text{fixed}} - \textcolor{#2f6fde}{\
 <!--
 ROHAN. About 1.5 minutes. ONE CLICK.
 
-So that gives us a ruler. For every flight we have a worst case, which is the fixed plan, and a best case, which is hindsight. The score is how much of the gap between them MPC closes. Distance here means average distance from the goal over the flight.
+So that gives us a ruler. For every flight we have a worst case, which is the fixed plan, and a best case, which is hindsight. The score is how much of the gap between them MPC closes. Cost here is distance to the goal after every move, added up over the whole flight.
 
-On the example flight we just watched, the fixed plan was about 2,400 km, hindsight about 500, and MPC about 640. So MPC closed 92 percent of the gap.
+On the example flight we just watched, over all 50 moves, the fixed plan was about 119,000 km, hindsight about 30,000, and MPC about 36,000. So MPC closed 92 percent of the gap.
 
-[click] Over all 32 launches, at 3.2 metres a second, the fixed plan is about 1,800 km, hindsight about 1,000, and MPC about 1,200. That's 77 percent. The rest is what the wrong forecast cost us.
+[click] Over all 32 launches, at 3.2 metres a second, the fixed plan is about 89,000 km, hindsight about 52,000, and MPC about 60,000. That's 77 percent. The rest is what the wrong forecast cost us.
 
 It also isn't 100 percent with a perfect forecast. With no error it's 87 percent, because the planner only looks 60 hours ahead while hindsight gets to plan the whole flight.
 
@@ -620,15 +620,15 @@ Every controller flies the same 32 launches, so a difference is always the same 
 <!--
 ROHAN. About 1.5 minutes. THREE CLICKS.
 
-Okay, results. Forecast error is on the bottom axis. Up the side is average distance from the goal, so lower is better. Hindsight is the flat black line, since it never sees the forecast.
+Okay, results. Forecast error is on the bottom axis. Up the side is distance to the goal summed over the flight, so lower is better. Hindsight is the flat black line, since it never sees the forecast.
 
 [click] The fixed plan. It gets worse as the forecast gets worse, which is what you'd expect.
 
 [click] And MPC. It's much lower, and it stays close to hindsight until the forecast is pretty bad.
 
-[click] The gap between orange and blue is what replanning is worth, since that's the only difference between them. With a real forecast, it gets you about 570 kilometres closer to the goal, on average over the flight. Even with a perfect forecast it's still 330.
+[click] The gap between orange and blue is what replanning is worth, since that's the only difference between them. With a real forecast, it saves about 28,000 km of summed distance. Even with a perfect forecast it's still about 16,000.
 
-[If asked why it helps with a perfect forecast: this is distance over the whole flight. The fixed plan reaches the goal and then drifts away. MPC stays. Intervals: 569 plus or minus 201, 327 plus or minus 158.]
+[If asked why it helps with a perfect forecast: this is distance over the whole flight. The fixed plan reaches the goal and then drifts away. MPC stays. Intervals: 28,465 plus or minus 10,056, and 16,358 plus or minus 7,904.]
 -->
 
 ---
@@ -668,7 +668,7 @@ ROHAN. About 1 minute. TWO CLICKS.
 
 Next is what MPC plans on. Normally the planner scores each plan on the one forecast, the mean wind. The alternative is to draw a bunch of possible winds around the forecast and score each plan on its average over all of them. That's the textbook way to plan under uncertainty. Below zero means it helped.
 
-[click] For the fixed plan it helps, by about 200 km, up to 3.2 metres a second of error. That makes sense, since it only gets one shot. So a plan that holds up when the forecast is wrong is worth having.
+[click] For the fixed plan it helps, by about 10,000 km, up to 3.2 metres a second of error. That makes sense, since it only gets one shot. So a plan that holds up when the forecast is wrong is worth having.
 
 [click] For MPC it does nothing, at any error level.
 
@@ -696,7 +696,7 @@ We think it's a scale thing. The balloon gets one reading every three hours alon
 
 So the gain over the fixed plan comes from replanning from where you actually are. It doesn't come from learning about the wind.
 
-[If asked: same answer on the cost that stops counting once the balloon arrives. The averages are a bit bigger there but still inside the noise.]
+[If asked: on the cost that stops counting at arrival, readings help detectably in 1 of the 24 comparisons (30 hours ahead, 1.6 m/s, by about 300 km), which is about what you'd expect by chance.]
 -->
 
 ---

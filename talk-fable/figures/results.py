@@ -1,7 +1,6 @@
 """The result figures of Part 4, drawn from the sweep's own rows (results/rows-2026-10-24.jsonl).
 
-Everything is on `summed_km`, distance to the goal summed over the 50 moves, divided by 50 so the axis reads
-as the average distance from the goal over the flight. That is the metric the tables in
+Everything is on `summed_km`, distance to the goal summed over the 50 moves, in km. That is the metric the tables in
 docs/results-2026-10-29.md use for replanning, readings, the horizon and hedging. Differences are paired
 within a seed; bars are 95% intervals on the paired mean (1.96 standard errors over 32 seeds).
 
@@ -10,7 +9,9 @@ within a seed; bars are 95% intervals on the paired mean (1.96 standard errors o
 
 import sys
 
+import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import numpy as np
 
 from balloon_sim.results import best_hindsight, one_arm, read_rows
@@ -27,14 +28,14 @@ rows = best_hindsight(one_arm(read_rows([REPO / "results" / "rows-2026-10-24.jso
 
 
 def cells(controller: str, horizon: int | None = None, n_winds: int = 0) -> dict[tuple[int, float], float]:
-    """{(seed, sigma): average distance from the goal in km} for one controller setting"""
+    """{(seed, sigma): distance to the goal summed over the flight, km} for one controller setting"""
     out = {}
     for r in rows:
         if r["controller"] != controller or r["n_winds"] != n_winds:
             continue
         if controller.startswith("mpc") and r["planner.horizon"] != horizon:
             continue
-        out[(r["seed"], r["belief.sigma"])] = r["summed_km"] / MOVES
+        out[(r["seed"], r["belief.sigma"])] = r["summed_km"]
     return out
 
 
@@ -54,7 +55,11 @@ def mean_ci(values: np.ndarray) -> tuple[float, float]:
     return float(values.mean()), float(1.96 * values.std(ddof=1) / np.sqrt(values.size))
 
 
+KM = "summed distance to the goal (km)"
+
+
 def error_axis(ax, label: bool = True) -> None:
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
     ax.set_xticks(X, [f"{s:g}" for s in SIGMAS])
     ax.set_xlim(-0.35, len(SIGMAS) - 0.65)
     if label:
@@ -78,7 +83,7 @@ def draw_bounds() -> None:
     fixed_mean = np.array([np.mean([km for (_, s), km in fixed.items() if s == sigma]) for sigma in SIGMAS])
     mpc_mean = np.array([np.mean([km for (_, s), km in mpc.items() if s == sigma]) for sigma in SIGMAS])
 
-    real = mark_real(ax, 2180, va="top")
+    real = mark_real(ax, 2180 * MOVES, va="top")
     h = [ax.plot(X, [hind_mean] * len(X), color=HINDSIGHT, marker="o", markersize=7)[0],
          ax.text(X[-1] + 0.12, hind_mean, "hindsight", color=HINDSIGHT, va="center", fontweight=600)]
     f = [ax.plot(X, fixed_mean, color=FIXED, marker="o", markersize=7)[0],
@@ -86,12 +91,12 @@ def draw_bounds() -> None:
     m = [ax.plot(X, mpc_mean, color=MPC, marker="o", markersize=7)[0],
          ax.text(X[-1] + 0.12, mpc_mean[-1], "MPC", color=MPC, va="center", fontweight=600)]
     gap = [ax.fill_between(X, mpc_mean, fixed_mean, color=MPC, alpha=0.10, linewidth=0),
-           ax.annotate("", (REAL, mpc_mean[REAL] + 25), (REAL, fixed_mean[REAL] - 25),
+           ax.annotate("", (REAL, mpc_mean[REAL] + 25 * MOVES), (REAL, fixed_mean[REAL] - 25 * MOVES),
                        arrowprops=dict(arrowstyle="<->", color=INK, linewidth=1.4)),
            ax.text(REAL + 0.12, (mpc_mean[REAL] + fixed_mean[REAL]) / 2, "what replanning\nis worth", va="center", fontsize=11.5,
                    linespacing=1.15)]
-    ax.set_ylabel("average distance from the goal (km)")
-    ax.set_ylim(800, 2200)
+    ax.set_ylabel(KM)
+    ax.set_ylim(800 * MOVES, 2200 * MOVES)
     error_axis(ax)
     ax.set_xlim(-0.35, len(SIGMAS) + 0.6)
     figure.tight_layout()
@@ -108,7 +113,7 @@ def draw_readings() -> None:
     figure, ax = plt.subplots(figsize=(7.0, 4.4))
     rng = np.random.default_rng(0)
     ax.axhline(0, color=INK, linewidth=1.0)
-    limit = 100 * np.ceil(max(np.abs(paired(mpc, blind, s)).max() for s in SIGMAS) / 100) + 50
+    limit = 5000 * np.ceil(max(np.abs(paired(mpc, blind, s)).max() for s in SIGMAS) / 5000) + 2500
     real = mark_real(ax, 0.94 * limit, va="top")
     dots, means = [], []
     for x, sigma in zip(X, SIGMAS):
@@ -118,7 +123,7 @@ def draw_readings() -> None:
         means.append(ax.errorbar(x, mean, yerr=half, color=INK, marker="D", markersize=8, capsize=6, linewidth=2.0, zorder=5))
     ax.text(-0.3, 0.7 * limit, "readings hurt", color=MUTED, fontsize=11.5, va="center")
     ax.text(-0.3, -0.7 * limit, "readings helped", color=MUTED, fontsize=11.5, va="center")
-    ax.set_ylabel("MPC with readings − without\naverage distance from the goal (km)")
+    ax.set_ylabel("MPC with readings − without\n" + KM)
     ax.set_ylim(-limit, limit)
     error_axis(ax)
     figure.tight_layout()
@@ -132,7 +137,7 @@ def draw_breaking() -> None:
     horizons = [5, 10, 20, 50]
     shades = ["#b9cdf5", "#7fa5ec", MPC, "#143a8a"]
     figure, ax = plt.subplots(figsize=(7.0, 4.5))
-    real = mark_real(ax, 690, va="top")
+    real = mark_real(ax, 690 * MOVES, va="top")
     layers = [real]
     for slot, (horizon, shade) in enumerate(zip(horizons, shades)):
         stats = [mean_ci(above_hindsight(cells("mpc", horizon), s)) for s in SIGMAS]
@@ -143,8 +148,8 @@ def draw_breaking() -> None:
         print(f"  horizon {horizon}: " + ", ".join(f"{m:.0f}" for m in means))
     title = ax.text(0.03, 0.89, "MPC plans ahead", color=MUTED, fontsize=11.5, transform=ax.transAxes)
     layers[1].append(title)
-    ax.set_ylabel("MPC above hindsight\naverage distance from the goal (km)")
-    ax.set_ylim(0, 700)
+    ax.set_ylabel("MPC above hindsight\n" + KM)
+    ax.set_ylim(0, 700 * MOVES)
     error_axis(ax)
     figure.tight_layout()
     save_layers(figure, "breaking", layers)
@@ -156,7 +161,7 @@ def draw_breaking() -> None:
 def draw_hedging() -> None:
     figure, ax = plt.subplots(figsize=(7.0, 4.4))
     ax.axhline(0, color=INK, linewidth=1.0)
-    real = mark_real(ax, 235, va="top")
+    real = mark_real(ax, 235 * MOVES, va="top")
     layers = [real]
     for offset, name, colour, many, few in (
         (-0.09, "fixed plan, 64 winds", FIXED, cells("fixed_plan", n_winds=64), cells("fixed_plan")),
@@ -169,9 +174,9 @@ def draw_hedging() -> None:
                         transform=ax.transAxes)
         layers.append([bar.lines[0], *bar.lines[1], *bar.lines[2], label])
         print(f"  {name}: " + ", ".join(f"{m:.0f}±{c:.0f}" for m, c in stats))
-    ax.text(len(SIGMAS) - 0.7, -330, "many winds helped", color=MUTED, fontsize=11.5, va="center", ha="right")
-    ax.set_ylabel("many winds − one forecast\naverage distance from the goal (km)")
-    ax.set_ylim(-420, 250)
+    ax.text(len(SIGMAS) - 0.7, -330 * MOVES, "many winds helped", color=MUTED, fontsize=11.5, va="center", ha="right")
+    ax.set_ylabel("many winds − one forecast\n" + KM)
+    ax.set_ylim(-420 * MOVES, 250 * MOVES)
     error_axis(ax)
     figure.tight_layout()
     save_layers(figure, "hedging", layers)
