@@ -110,13 +110,13 @@ Conditional diffusion, trained on ERA5. Unbounded in space & time.
     <p class="ours-h">Ours</p>
     <img src="/figures/intro_pair_diffusion.png" />
     <p class="ours-dim">64 × 64 × 18 levels × (u, v) × 4 hours</p>
-    <p class="ours-sub">0.25° grid, 16° across, 14 to 20 km</p>
+    <p class="ours-sub">16° across, 14 to 20 km</p>
   </div>
   <div class="ours-ble" v-click>
     <p class="ours-h">BLE's VAE</p>
     <img src="/figures/intro_pair_blevae.png" />
     <p class="ours-dim">21 × 21 × 10 levels × (u, v) × 9 frames</p>
-    <p class="ours-sub">1,000 km box, 48 hours, no location or time input</p>
+    <p class="ours-sub">1,000 km across, 48 hours</p>
   </div>
 </div>
 
@@ -221,7 +221,7 @@ Generated wind against held-out ERA5.
 
 <Checks />
 
-<p v-click class="caption" style="margin-top: 0.8rem">ERA5 reference: one half of held-out ERA5 scored against the other half. Closer to it is better.</p>
+<p v-click class="caption" style="margin-top: 0.8rem">ERA5 reference: ERA5 data scored against itself.</p>
 
 <!--
 Shaurya, 1 min.
@@ -238,7 +238,7 @@ Reference: held-out ERA5, NE Pacific, days 8-14 of Jan/Apr/Jul/Oct 2023, not use
 
 # Realism results
 
-Closer to ERA5 than BLE's generator on all four checks. Change over time is still far off for both.
+Better than BLE on all metrics.
 
 <img v-if="$clicks < 1" src="/figures/realism-1.png" class="fig" style="max-height: 320px" />
 <img v-else src="/figures/realism-2.png" class="fig" style="max-height: 320px" />
@@ -260,13 +260,10 @@ Source: balloon-env-dev/docs/benchmark-reports/benchmark_v2_4yr_250000.md, summe
 ---
 
 # Limits of realism checks
+- Simplex noise doesn't have any weather features, doesn't condition.
+- This benchmark doesn't tell you whether a model is useful for control
 
-- Simplex noise fitted to ERA5's statistics scores better than both generators.
-- It doesn't have any weather features like jets or storms and doesn't condition on time/place.
-- These checks just measure statistics, not usefulness for control.
-
-<p v-click style="font-size: 1.5rem; font-weight: 600; margin-top: 2.2rem; color: #1a1a1a">What does a wind model need to get right for a controller built on it to transfer to real wind?</p>
-
+<p v-click style="font-size: 1.5rem; font-weight: 600; margin-top: 2.2rem; color: #1a1a1a">What does a wind model need for a controller built on it to transfer to real wind</p>
 <!--
 Shaurya, 1 min. The turn in the talk.
 The simplex noise was fitted to these statistics: per-level mean and spread, correlations between levels and hours, and its scale tuned to the spectrum. So it scores well by construction.
@@ -801,8 +798,6 @@ Images: talk/public/fig/split-truth-px.png and split-coarse-px.png, drawn by tal
   <li><b>Kind of error, same size:</b> e.g. Gaussian process or simplex</li>
 </ul>
 
-<p v-click class="pt-bet"><b>Expected:</b> altitude levels matter most. The balloon steers on differences between altitudes.</p>
-
 <style>
 .cp { margin-top: 1.6rem !important; font-size: 1.3rem; padding-left: 1.4rem !important; }
 .cp li { margin: 0.7rem 0 !important; }
@@ -812,12 +807,12 @@ Images: talk/public/fig/split-truth-px.png and split-coarse-px.png, drawn by tal
 </style>
 
 <!--
-Shaurya, about 45 seconds. ONE CLICK.
+Shaurya, about 45 seconds. No clicks.
 These are the candidates. None of it is locked, and each is made worse in steps, one at a time.
 The first three are resolution: how many altitude levels, how fine the grid, how far apart the frames are in time.
 Locations: one patch of ERA5, or winds from many places. If one patch is enough, the generator can output less and train on less.
 Kind of error: the error in Rohan's pilot was a Gaussian process draw. Here the size stays the same and only its kind changes, for example a Gaussian process against simplex noise.
-[click] Our bet is that altitude levels matter most, because the balloon steers on the differences between altitudes.
+If asked what we expect: altitude levels matter most, because the balloon steers on the differences between altitudes.
 Why we expect it: in Rohan's part only downwind goals were reachable, and the balloon's only choice is which altitude to sit at.
 -->
 
@@ -859,7 +854,7 @@ The task pictures are schematic. Figures: talk/figures/tasks.py
   <tr><td>Grid spacing</td><td>0.25°</td><td class="q">?</td></tr>
 </table>
 
-<p v-click class="pt-bet"><b>Result:</b> the cheapest generator that still transfers.</p>
+<p class="pt-bet"><b>Result:</b> the cheapest generator that still transfers.</p>
 
 <style>
 .pt { width: 100%; margin-top: 1.4rem; border-collapse: collapse; font-size: 1.15rem; }
@@ -874,11 +869,11 @@ The task pictures are schematic. Figures: talk/figures/tasks.py
 </style>
 
 <!--
-Shaurya, about 45 seconds. ONE CLICK.
+Shaurya, about 45 seconds. No clicks.
 Three of the properties are settings of our generator: how many altitude levels it makes, how often it gives a frame, and how fine its grid is. Each one costs compute. Today they're 18 levels, hourly, a quarter degree. We picked those by judgement.
 The experiment fills in the last column: for each setting, the coarsest step where the score still holds.
 One limit: the experiment's truth is ERA5 at 2 degrees and every 3 hours, so it can say how much coarser than that is fine, not anything about finer detail.
-[click] Put the three together and that's the cheapest generator that still transfers.
+Put the three together and that's the cheapest generator that still transfers.
 If asked about locations: it's about training data, not resolution, so it isn't a row here. If one patch is enough, the generator can be smaller and train on less.
 If asked about kind of error: it isn't a setting, so it's not here. It tells us which mistakes a generator can afford.
 -->
