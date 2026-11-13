@@ -64,14 +64,11 @@ def error_axis(ax, label: bool = True) -> None:
     ax.set_xlim(-0.35, len(SIGMAS) - 0.65)
     if label:
         ax.set_xlabel("forecast error (m/s)")
-    ax.get_xticklabels()[REAL].set_fontweight(700)
 
 
 def mark_real(ax, y: float, va: str = "bottom"):
     """Says which rung of the ladder is a real forecast's error"""
-    line = ax.axvline(REAL, color=FAINT, linewidth=10, zorder=0)
-    text = ax.text(REAL, y, "about a real\nforecast's error", ha="center", va=va, fontsize=10.5, color=MUTED, linespacing=1.15)
-    return [line, text]
+    return []  # the talk no longer marks one error level as "real"
 
 
 # --- three controllers against forecast error: where MPC sits, and what replanning is worth -----------------
