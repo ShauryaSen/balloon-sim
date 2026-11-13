@@ -821,11 +821,18 @@ If asked about kind of error: it isn't a setting, so it's not here. It tells us 
       <p class="q-c">Station keeping, navigating to waypoints, or distance from launch.</p>
     </div>
   </div>
+  <div class="q">
+    <div class="q-n">4</div>
+    <div>
+      <p class="q-t">What should this build toward?</p>
+      <p class="q-c">The GitHub repo with the generator and the environment, and a paper from the experiments. What else?</p>
+    </div>
+  </div>
 </div>
 
 <style>
-.qs { margin-top: 2rem; }
-.q { display: grid; grid-template-columns: 44px 1fr; align-items: start; margin-bottom: 2.2rem; }
+.qs { margin-top: 1.2rem; }
+.q { display: grid; grid-template-columns: 44px 1fr; align-items: start; margin-bottom: 1.4rem; }
 .q-n { font-size: 1.6rem; font-weight: 600; color: #4f7db3; line-height: 1.25; }
 .q-t { font-size: 1.6rem !important; font-weight: 500; color: #1a1a1a !important; line-height: 1.25 !important; margin: 0 !important; }
 .q-c { font-size: 1rem !important; color: #888 !important; margin: 6px 0 0 !important; line-height: 1.4 !important; }
@@ -833,10 +840,11 @@ If asked about kind of error: it isn't a setting, so it's not here. It tells us 
 
 <!--
 Shaurya, about 0.5 min. NO CLICKS. Then 30 min discussion.
-Three things we'd like your input on before we run this.
+Four things we'd like your input on.
 One: the properties. We have four so far. What else would you degrade?
 Two: the stand-in. A degraded copy of ERA5 is wrong in one way, which is why a drop in score has one cause. A real generator is wrong in several ways at once. Does what we learn from the copies carry over?
 Three: the tasks. We have station keeping, navigating to waypoints, and getting as far from launch as possible. Which should we run first and report as the main result?
+Four (Rohan): long-term goals. What should all this build toward? One part is the GitHub repo with the actual generator and the environment. But we'd want the experiments to lead to something too, like a paper. What do you think that should look like?
 Leave this slide up for the discussion.
 If the discussion goes to training data: the experiment doesn't measure it; it's about resolution.
 -->
