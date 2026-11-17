@@ -24,6 +24,24 @@ Tags: **(measured)** our own data; **(cited)** checked against the paper, with h
    truth.
 6. **The column rung of the grid ladder waits** for a belief that reads where the balloon is; the other rungs
    do not need it.
+7. **A 10-level rung** joins the levels ladder (18, 10, 9, 6, 3, 2, 1), so BLE's exact level count is on it
+   (BLE `generative/vae.py`, FieldShape: 10 levels, 50 to 140 hPa).
+8. **Climb limit × levels.** The levels ladder is flown again at twice the climb limit. At 2 levels the
+   balloon cannot cross between them in one move at the base limit, so part of a loss could be reach, not
+   information. The second run separates the two.
+9. **The shape contrast at 2x as well.** Uniform offset against altitude ramp is flown at 2x a day-old
+   forecast's error too, so the result does not hang on choosing 1x.
+10. **Why each ladder is where it is.** Every ladder doubles per step (a convention, assumed) and crosses the
+    wind's own scale: levels from 0.3 to 5.9 km apart against the error's 1.3 km; frames from 3 h to frozen
+    against the error's 9 h and the wind's 31 h; grid from 2° to 16° (about 220 to 1,800 km) against the
+    error's 544 km and the wind's 1,050 km (all measured). Rungs sit on real models where they can: 18 levels
+    ours, 10 BLE, about 5 to 6 ERA5's pressure levels, 2 released cBottle; 6 h BLE and cBottle-video, 12 h
+    GenCast. **Limit:** nothing finer than the truth (2°, 3 h) can be tested, so the generator's own 0.25° and
+    1 h are out of reach; ERA5's effective resolution is about 600 km (Bolgiani et al. 2022), so little real
+    detail lives below 2°.
+11. **Generator settings are not varied here.** Tile size, diffusion steps and the like belong to the generator
+    evaluation, where they are the scientific variables. This experiment degrades ERA5 and never runs the
+    generator.
 
 ## The question
 
