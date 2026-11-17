@@ -21,10 +21,14 @@ class WindField(NamedTuple):
     uv: jax.Array  # (n_t, n_alt, n_lat, n_lon, 2) eastward and northward wind in m/s
 
 
-def load_record(path: str) -> WindField:
-    """The true wind in a record file (ERA5 or cBottle, same format), with every axis made ascending"""
+def load_record(path: str, field: str = "") -> WindField:
+    """The true wind in a record file (ERA5 or cBottle, same format), with every axis made ascending.
+
+    `field` names which wind: "" is the truth (u, v); "forecast_" is the persistence forecast an ERA5 record
+    also carries (forecast_u, forecast_v: the truth 24 h earlier), used by degrade.persistence.
+    """
     record = np.load(path)
-    uv = np.stack([record["u"], record["v"]], axis=-1)
+    uv = np.stack([record[f"{field}u"], record[f"{field}v"]], axis=-1)
     axes = [record["hours"], record["altitude_km"], record["latitude"], record["longitude"]]
     for i, coordinate in enumerate(axes):
         if coordinate[0] > coordinate[-1]:  # ERA5 lists altitude top-down
