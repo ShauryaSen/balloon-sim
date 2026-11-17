@@ -4,6 +4,27 @@ Supersedes `fidelity-variables-2026-11-06.md` after a literature pass and measur
 Tags: **(measured)** our own data; **(cited)** checked against the paper, with how much of it was read;
 **(assumed)** a judgement, unverified.
 
+## Changes locked 2026-11-17 (after the lab talk; these override the sections below)
+
+1. **Score: share of control lost.** (MPC on the copy − MPC on the truth) ÷ (coast − MPC on the truth), paired
+   per seed, with the raw km beside it. Coast never changes altitude, so the denominator is the same at every
+   rung: 0 is nothing lost, 1 is control made worthless. Replaces the fixed-plan-to-hindsight score, which
+   divides by about zero on the undegraded copy, where the fixed plan plans on the truth itself.
+2. **Primary task: station keeping**, as below; reach and escape secondary.
+3. **Kind of error: shape at one size.** Five shapes, all scaled to one size, the RMS of a persistence forecast's
+   error in the launch band (1x a day-old forecast, measured 3.2 m/s on the 6-level record): uniform offset;
+   offset varying by altitude; random, the same at every altitude; random, varying by altitude (the pilot's GP);
+   and **persistence**, the truth 24 h earlier, the one real, structured error. Sizes are written as multiples of
+   a day-old forecast, not m/s.
+4. **Amplitude is dropped.** It mostly restates wind error; the other properties and the shapes carry the
+   hypothesis.
+5. **Controllers: MPC and PPO, both rigorous.** MPC runs first. PPO joins once, on the undegraded truth, it beats
+   greedy and closes a stated share of coast-to-MPC; then 5 training seeds per condition, means with 95%
+   intervals (Agarwal et al. 2021), one tuning budget for every condition, its observation fixed once on the
+   truth.
+6. **The column rung of the grid ladder waits** for a belief that reads where the balloon is; the other rungs
+   do not need it.
+
 ## The question
 
 Which properties of a wind model must be right for a controller built with it to perform in the real wind, and

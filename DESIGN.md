@@ -257,6 +257,11 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     balloon after 1, 4 and 16 moves to the point it is steering for: MPC's lookahead given to the policy as
     features instead of searched. "column" is the original and stays the default. "ahead" trains about 13
     times slower than "column" on a fleet of four.
+53. **The fidelity design after the lab talk** (`docs/fidelity-design-2026-11-06.md`, "Changes locked
+    2026-11-17"). Score is the share of control lost against coast, since the fixed-plan-to-hindsight gap is
+    about zero on the undegraded copy; station keeping leads; the kind-of-error property becomes five shapes at
+    one size, persistence among them; amplitude is dropped; MPC first, PPO once it works on the truth, at 5
+    training seeds. The talk's other points are in `docs/directions-2026-11-17.md`.
 
 ## Open
 
