@@ -295,6 +295,25 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     BLE's settings than about the kinds of error. Pressure for the BLE models is the standard atmosphere's
     isothermal layer; km are flat at the equator (both assumed). The pre-registered two-measure test was run and
     is reported once in `docs/fidelity-results-2026-11-17.md`, not carried forward.
+57. **RL is BLE's published recipe, retrained in our simulator, with readings on** (decided 2026-11-18). Read
+    from `google/balloon-learning-environment` on 2026-11-18 (`agents/configs/quantile.gin`, "the same configuration
+    used in our Nature paper"; `agents/networks.py`; `env/balloon_env.py`; `env/features.py`;
+    `agents/marco_polo_exploration.py`, `agents/random_walk_agent.py`):
+    - QR-DQN, 51 quantiles; an MLP of 8 layers (7 hidden of 600 units, ReLU); gamma 0.993; 5-step returns; Adam,
+      learning rate 2e-6, eps 2e-5; batch 32; prioritized replay of 2M; an update every 4 steps; target network
+      every 100; 500 transitions before learning; epsilon 0.
+    - Exploration (MarcoPolo): 80% of episodes are exploratory, alternating 4 h of the policy with 2 h of a
+      random walk in altitude (target pressure drifting by Gaussian steps, 100 Pa hysteresis).
+    - Actions up, stay, down every 3 min. Reward 1 inside 50 km, else 0.4 * 2^(-(d - 50 km) / 100 km).
+    - Observation: per level, the belief's wind as its angle to the station, its speed (squashed at 30 m/s) and
+      its uncertainty, centred on the balloon's level; plus ambient features.
+    Ours differs where our simulator differs, each assumed: no battery, solar or power features and no power
+    penalty in the reward (our balloon has no power model); our 18 levels instead of BLE's 181 interpolated
+    pressure levels (the band, 14.3 to 20.2 km, is about BLE's 5,000 to 14,000 Pa, so only the spacing differs);
+    up and down are our climb limit per 3 min; the belief is KernelBelief with the measured K, so the uncertainty
+    is its posterior standard deviation. Training launches use seeds from 100,000 up; the 32 test seeds never.
+    **Go/no-go**, on the true wind with readings on, 5 training seeds: the mean TWR50 must beat greedy and close
+    at least half of the gap from coast to MPC. Failing it is reported as a result, and no RL fidelity sweep runs.
 
 ## Open
 
