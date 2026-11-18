@@ -99,3 +99,36 @@ def test_persistence_reads_the_records_forecast_and_sizes_its_error(tmp_path):
     truth, earlier = load_record(str(tmp_path / "r.npz")), load_record(str(tmp_path / "r.npz"), "forecast_")
     assert jnp.allclose(degrade.persistence(truth, earlier).uv - truth.uv, jnp.array([2.0, -2.0]), atol=1e-5)
     assert abs(degrade.error_size(truth, earlier, (20.0, 50.0)) - 2.0) < 1e-4
+
+
+def equator_field() -> WindField:
+    """A zero wind on a grid across the equator, so a copy's wind is minus its error"""
+    hours, lat, lon = jnp.arange(0.0, 25.0), jnp.arange(-10.0, 11.0, 2.0), jnp.arange(0.0, 41.0, 2.0)
+    return WindField(hours, ALTITUDE, lat, lon, jnp.zeros((len(hours), len(ALTITUDE), len(lat), len(lon), 2)))
+
+
+def test_every_error_model_comes_out_at_the_size_asked_and_keeps_the_grid():
+    field = equator_field()
+    earlier = field._replace(uv=jax.random.normal(jax.random.PRNGKey(1), field.uv.shape))
+    for name in degrade.ERROR_MODELS:
+        copy = degrade.copy(name, field, jax.random.PRNGKey(3), BeliefConfig(), 2.5, earlier, (-10.0, 10.0))
+        assert copy.uv.shape == field.uv.shape
+        assert np.isclose(float(jnp.sqrt(jnp.mean(copy.uv[:, :, :, :-1] ** 2))), 2.5, rtol=1e-4), name
+
+
+def test_scaled_persistence_is_the_real_error_resized():
+    field = equator_field()
+    field = field._replace(uv=jax.random.normal(jax.random.PRNGKey(2), field.uv.shape))
+    earlier = field._replace(uv=field.uv * 0.5)
+    copy = degrade.error_model("persistence_scaled", field, jax.random.PRNGKey(0), BeliefConfig(), 1.0, (-10.0, 10.0), earlier)
+    error = field.uv - copy.uv
+    ratio = error / (field.uv - earlier.uv)
+    assert jnp.allclose(ratio, ratio.reshape(-1)[0], atol=1e-4)  # one scale factor everywhere: the real error's shape, kept
+
+
+def test_bles_gp_has_bles_correlations():
+    """Matern 1/2 is exp(-r): two points 357 km apart east-west should correlate about exp(-1)"""
+    field = equator_field()._replace(lon=jnp.arange(0.0, 361.0, 3.207), uv=jnp.zeros((25, 7, 11, 113, 2)))
+    draws = jnp.stack([degrade.ble_gp_error(field, jax.random.PRNGKey(s)) for s in range(16)])
+    near = float(jnp.mean(draws[..., :-1, :] * draws[..., 1:, :]) / jnp.mean(draws**2))  # one step is 357 km
+    assert abs(near - np.exp(-1.0)) < 0.06

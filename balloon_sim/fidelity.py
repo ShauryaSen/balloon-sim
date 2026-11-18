@@ -42,6 +42,12 @@ SHAPES = ("offset", "offset_altitude", "random", "random_altitude", "persistence
 AT_TWICE = ("offset", "offset_altitude")
 OTHER_HORIZONS = (6.0, 24.0)
 
+ERROR_MODELS = ("simplex", "gp_ble", "gp_fitted", "persistence_scaled")  # balloon_sim.degrade.error_model
+ERROR_SIZES_MS = (0.5, 1.0, 2.0, 3.5, 5.0)
+"""From about half BLE's own simplex size (1.05 m/s, measured on its code) to a day-old forecast's error here
+(5.0 m/s, measured), through Loon's 12 h forecast error (3.5 m/s, as BLE's code comment gives it). The spacing
+is a choice (assumed); the end points are the two sizes people build with"""
+
 
 class Cell(NamedTuple):
     controller: str  # "mpc" or "coast"
@@ -69,6 +75,18 @@ def cells(seeds: tuple[int, ...] = tuple(range(32))) -> list[Cell]:
         out += [mpc(seed, copy, "base", size=2.0) for copy in AT_TWICE]
         out += [mpc(seed, copy, "climb", climb=2.0) for copy in ("truth",) + LEVELS]
         out += [mpc(seed, copy, "horizon", horizon=h) for h in OTHER_HORIZONS for copy in ("truth",) + FRAMES]
+    return out
+
+
+def error_cells(seeds: tuple[int, ...] = tuple(range(32))) -> list[Cell]:
+    """The errors arm (2026-11-18): each error model people build a forecast with, at each size, in m/s rather
+    than in multiples of a day-old forecast. Its own coast and MPC on the truth per seed, the same flights as the
+    base arm's, flown again so the arm is scored on its own rows"""
+    out: list[Cell] = []
+    for seed in seeds:
+        out.append(Cell("coast", seed, "truth", 0.0, 1.0, BASE_HORIZON_HOURS, "errors"))
+        out.append(Cell("mpc", seed, "truth", 0.0, 1.0, BASE_HORIZON_HOURS, "errors"))
+        out += [Cell("mpc", seed, model, size, 1.0, BASE_HORIZON_HOURS, "errors") for model in ERROR_MODELS for size in ERROR_SIZES_MS]
     return out
 
 

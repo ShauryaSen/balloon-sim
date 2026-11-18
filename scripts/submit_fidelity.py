@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from balloon_sim.fidelity import cells
+from balloon_sim.fidelity import cells, error_cells
 
 SCRIPT = """#!/bin/bash
 #SBATCH --job-name=fid-{name}
@@ -41,10 +41,11 @@ def main() -> None:
     ask.add_argument("--mem-gb", type=int, default=8)
     ask.add_argument("--minutes", type=int, default=240)
     ask.add_argument("--at-once", type=int, default=200)
+    ask.add_argument("--arm", choices=("sweep", "errors"), default="sweep", help="the 2026-11-17 sweep, or the errors arm")
     ask.add_argument("--dry-run", action="store_true")
     a = ask.parse_args()
 
-    todo = cells(tuple(a.seeds))
+    todo = (error_cells if a.arm == "errors" else cells)(tuple(a.seeds))
     repo = Path(__file__).resolve().parents[1]
     base = repo / "results" / f"fidelity-{a.name}"
     logs, rows = base / "logs", base / "rows"

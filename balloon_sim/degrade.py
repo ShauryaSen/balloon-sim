@@ -144,6 +144,117 @@ def persistence(truth: WindField, earlier: WindField) -> WindField:
     return truth._replace(uv=earlier.uv)
 
 
+# --- forecast errors as people build them (2026-11-18) ---------------------------------------------------------
+#
+# Each is an error field with the shape a published simulator or our own gives it, scaled to a chosen size: the
+# RMS per component over the launch band, as error_size measures persistence. The shape is the model's; the size
+# is the experiment's, swept, so a loss can be put down to the shape at equal size.
+
+KM_PER_DEG_LON, KM_PER_DEG_LAT = 111.32, 110.57
+"""Flat km from degrees, taken at the equator: the launch band is within 10 degrees of it (cos 10 = 0.985);
+BLE also measures its noise in flat km from the station (assumed adequate)"""
+
+# BLE's simplex noise, balloon_learning_environment/env/simplex_wind_noise.py (google/balloon-learning-environment,
+# read 2026-11-18): five harmonics per component, each (weight, km east, km north, Pa, hours) between grid points
+BLE_SIMPLEX = {
+    "u": ((0.1445, 702.269, 2116.987, 2587.802, 245.0), (0.2766, 1483.570, 752.124, 646.208, 16.39),
+          (0.2627, 276.810, 147.040, 587.702, 3.836), (0.2137, 10214.525, 1512.216, 965.629, 41.780),
+          (0.1025, 181.286, 420.942, 8500.0, 245.0)),
+    "v": ((0.2716, 1974.228, 2028.814, 713.697, 26.435), (0.2684, 699.738, 541.845, 632.116, 9.530),
+          (0.2348, 217.750, 196.522, 686.825, 3.546), (0.1186, 47.500, 43.048, 66.553, 8.424),
+          (0.1066, 3663.291, 232.023, 7499.741, 225.0)),
+}
+
+# BLE's GP over the forecast's error, balloon_learning_environment/env/wind_gp.py (read 2026-11-18): Matern 1/2
+# over the joint scaled distance of (km east, km north, Pa, hours)
+BLE_GP_SCALES = (357.0, 357.0, 326.0, 34560.0 / 3600.0)
+
+
+def pressure_pa(altitude_km: jax.Array) -> jax.Array:
+    """The standard atmosphere's pressure in its isothermal layer, 11 to 20 km: 22,632 Pa at 11 km, scale height
+    6.3416 km (ISO 2533). Our band is 14.3 to 20.2 km; the top 0.2 km is past the layer (assumed negligible)"""
+    return 22632.0 * jnp.exp(-(jnp.asarray(altitude_km) - 11.0) / 6.3416)
+
+
+def _to_size(truth: WindField, error: jax.Array, size: float, lat_band: tuple[float, float]) -> jax.Array:
+    """error rescaled so its RMS per component over the launch band, seam left out, is `size`"""
+    rows = (truth.lat >= lat_band[0]) & (truth.lat <= lat_band[1])
+    return error * size / jnp.sqrt(jnp.mean(error[:, :, rows, :-1] ** 2))
+
+
+def simplex_error(truth: WindField, key: jax.Array) -> jax.Array:
+    """BLE's simplex noise on the record's grid, one independent field per component, in BLE's own units.
+    Each harmonic is OpenSimplex 4-D noise on (km east, km north, Pa, hours) over its spacings, from a random
+    seed and a random offset of the noise grid in [-1, 1), as BLE does; the harmonics are summed with BLE's
+    weights and variance adjustment. The library's version differs from BLE's pin, which changes the noise's
+    overall size but not its shape, and the size is set afterwards anyway"""
+    import numpy as np
+    import opensimplex
+
+    x = np.asarray(truth.lon) * KM_PER_DEG_LON
+    y = np.asarray(truth.lat) * KM_PER_DEG_LAT
+    p = np.asarray(pressure_pa(truth.altitude_km))
+    t = np.asarray(truth.hours)
+    rng = np.random.default_rng(int(jax.random.randint(key, (), 0, 2**31 - 1)))
+    fields = []
+    for component in ("u", "v"):
+        harmonics = BLE_SIMPLEX[component]
+        total, weight, weight_sq = 0.0, sum(h[0] for h in harmonics), sum(h[0] ** 2 for h in harmonics)
+        for w, xs, ys, ps, ts in harmonics:
+            opensimplex.seed(int(rng.integers(0, 2**31 - 1)))
+            dx, dy, dp, dt = rng.uniform(-1.0, 1.0, 4)
+            total = total + w * opensimplex.noise4array(x / xs + dx, y / ys + dy, p / ps + dp, t / ts + dt)  # (t, alt, lat, lon)
+        fields.append(total / weight * np.sqrt(weight / weight_sq))
+    return jnp.asarray(np.stack(fields, axis=-1), dtype=truth.uv.dtype)
+
+
+def ble_gp_error(truth: WindField, key: jax.Array, n_features: int = 512) -> jax.Array:
+    """A draw of BLE's GP prior on the record's grid, by random Fourier features: Matern 1/2 is exp(-r) on the
+    scaled distance r, whose spectrum is a multivariate t with one degree of freedom, so each frequency is a
+    Gaussian over sqrt of a chi-squared(1) draw (Rahimi & Recht 2007). The feature sum is separable in the four
+    axes, so the grid is a product of four small tables, contracted one axis at a time"""
+    axes = (truth.hours, pressure_pa(truth.altitude_km), truth.lat * KM_PER_DEG_LAT, truth.lon * KM_PER_DEG_LON)
+    scales = (BLE_GP_SCALES[3], BLE_GP_SCALES[2], BLE_GP_SCALES[1], BLE_GP_SCALES[0])
+    fields = []
+    for k in jax.random.split(key, 2):
+        k_z, k_g, k_b, k_a = jax.random.split(k, 4)
+        w = jax.random.normal(k_z, (n_features, 4)) / jnp.sqrt(jax.random.chisquare(k_g, 1.0, (n_features, 1)))
+        b = jax.random.uniform(k_b, (n_features,), maxval=2 * jnp.pi)
+        a = jax.random.normal(k_a, (n_features,))
+        tables = [jnp.exp(1j * (jnp.asarray(axis)[:, None] / scale) * w[None, :, i]) for i, (axis, scale) in enumerate(zip(axes, scales))]
+        field = jnp.einsum("tf,pf,yf,xf,f->tpyx", *tables, a * jnp.exp(1j * b), optimize=True).real
+        fields.append(field * jnp.sqrt(2.0 / n_features))
+    return jnp.stack(fields, axis=-1).astype(truth.uv.dtype)
+
+
+def fitted_gp_error(truth: WindField, key: jax.Array, kernel: BeliefConfig) -> jax.Array:
+    """A draw of our own GP, the kernel fitted to a day-old forecast's error on ERA5 (BeliefConfig): the
+    forecast error every sweep before this one was built with"""
+    return error_draws(kernel, key, truth, 1)[0]
+
+
+ERROR_MODELS = ("simplex", "gp_ble", "gp_fitted", "persistence_scaled")
+
+
+def error_model(name: str, truth: WindField, key: jax.Array, kernel: BeliefConfig, size: float, lat_band: tuple[float, float],
+                earlier: WindField | None = None) -> WindField:
+    """The truth with one error model's field taken off, at RMS `size` m/s per component over the launch band.
+    "persistence_scaled" is the real error, truth minus the truth 24 h earlier, scaled up or down"""
+    if name == "simplex":
+        error = simplex_error(truth, key)
+    elif name == "gp_ble":
+        error = ble_gp_error(truth, key)
+    elif name == "gp_fitted":
+        error = fitted_gp_error(truth, key, kernel)
+    elif name == "persistence_scaled":
+        if earlier is None:
+            raise ValueError("persistence_scaled needs the record's forecast field")
+        error = truth.uv - earlier.uv
+    else:
+        raise ValueError(f"no such error model: {name}; they are {ERROR_MODELS}")
+    return truth._replace(uv=truth.uv - _to_size(truth, error, size, lat_band))
+
+
 def error_size(truth: WindField, earlier: WindField, lat_band: tuple[float, float]) -> float:
     """The RMS per component of the persistence error over the launch band: 1x a day-old forecast's error.
     The seam column is left out, since it repeats the first"""
@@ -172,11 +283,14 @@ def errors(truth: WindField, copy: WindField, lat_band: tuple[float, float]) -> 
 COPIES = ("truth", "levels", "frames", "grid", "offset", "offset_altitude", "random", "random_altitude", "persistence")
 
 
-def copy(name: str, truth: WindField, key: jax.Array, kernel: BeliefConfig, size: float, earlier: WindField | None = None) -> WindField:
+def copy(name: str, truth: WindField, key: jax.Array, kernel: BeliefConfig, size: float, earlier: WindField | None = None,
+         lat_band: tuple[float, float] = (-10.0, 10.0)) -> WindField:
     """A copy by its name, as a cell and a row write it: "truth", "levels:9", "frames:4", "frames:frozen",
     "grid:2", "offset", "offset_altitude", "random", "random_altitude" or "persistence". `size` is in m/s and
     only the wrong copies read it"""
     kind, _, setting = name.partition(":")
+    if kind in ERROR_MODELS:
+        return error_model(kind, truth, key, kernel, size, lat_band, earlier)
     if kind == "truth":
         return truth
     if kind == "levels":

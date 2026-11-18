@@ -47,7 +47,8 @@ def fly_one(cell: Cell, truth, earlier, one_x: float, out: str) -> None:
     balloon, planner, task_config = configs(cell)
     k_task, k_error, k_fly = keys(cell.seed)
     mission, task = fleet.draw_mission(task_config, k_task, truth)
-    copied = degrade.copy(cell.copy, truth, k_error, BeliefConfig(), cell.size * one_x, earlier)
+    size_ms = cell.size if cell.arm == "errors" else cell.size * one_x  # the errors arm gives its sizes in m/s
+    copied = degrade.copy(cell.copy, truth, k_error, BeliefConfig(), size_ms, earlier, LAUNCH_BAND)
     if cell.controller == "coast":
         controller = fleet.coast(mission)
     else:  # readings off: the copy is the whole of what MPC knows, so it is planned on as a plain field
@@ -59,7 +60,7 @@ def fly_one(cell: Cell, truth, earlier, one_x: float, out: str) -> None:
     errors = degrade.errors(truth, copied, LAUNCH_BAND)
     row = fleet.fleet_row(flight, mission, task, controller=cell.controller, n_winds=0, seed=cell.seed, seconds=seconds,
                           settings={"balloon": balloon, "planner": planner, "task": task_config},
-                          extra={**cell._asdict(), "size_ms": cell.size * one_x, "one_x_ms": one_x, **errors})
+                          extra={**cell._asdict(), "size_ms": size_ms, "one_x_ms": one_x, **errors})
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     write_rows(out, [row])
     print(f"{cell.controller:5s} seed {cell.seed:2d} {cell.copy:16s} size {cell.size:g} climb {cell.climb_scale:g} "
