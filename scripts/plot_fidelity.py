@@ -12,7 +12,7 @@ the seeds. Each copy is scored against MPC on the truth in its own arm.
     shapes.png        score of each error shape at 1x, and the two offsets at 2x, a day-old forecast's error
     interactions.png  levels at two climb limits; frames at three horizons
 
-The dashed line at 0.10 is a reading aid, not a test: a loss under a tenth of MPC's control (assumed).
+Titles name what is plotted, not what it shows; the numbers under them are the reading.
 """
 
 import argparse
@@ -30,7 +30,6 @@ from balloon_sim.fidelity import FRAMES, GRID, LEVELS, SHAPES, score
 
 INK, MUTED, GRIDLINE, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"  # categorical slots 1-3, validated all-pairs
-SMALL = 0.10
 
 LABEL = {
     "levels:10": "10", "levels:9": "9", "levels:6": "6", "levels:3": "3", "levels:2": "2", "levels:1": "1",
@@ -65,6 +64,14 @@ def load(path: Path) -> dict:
     return out
 
 
+FAMILY = {"coarse": BLUE, "added": ORANGE, "real": AQUA}
+
+
+def spearman(x, y) -> float:
+    ranks = lambda a: np.argsort(np.argsort(a)).astype(float)
+    return float(np.corrcoef(ranks(np.asarray(x)), ranks(np.asarray(y)))[0, 1])
+
+
 def style(ax, ylabel=True) -> None:
     ax.set_facecolor(SURFACE)
     for side in ("top", "right"):
@@ -78,7 +85,6 @@ def style(ax, ylabel=True) -> None:
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     if ylabel:
         ax.set_ylabel("control lost", color=MUTED, fontsize=9)
-    ax.axhline(SMALL, color=MUTED, linewidth=0.8, linestyle=(0, (3, 3)))
 
 
 def bars(ax, xs, s, color) -> None:
@@ -97,20 +103,24 @@ def title(fig, text, sub) -> None:
 def test_figure(r: dict, out: Path) -> None:
     base = {k[3] + (f"@{k[4]:g}" if k[4] not in (0.0, 1.0) else ""): v for k, v in r.items() if k[0] == "base"}
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.2), sharey=True, facecolor=SURFACE)
-    fig.subplots_adjust(left=0.07, right=0.98, top=0.78, bottom=0.14, wspace=0.08)
-    title(fig, "Control loss follows the wind error, not the level-difference error",
-          "Station keeping, 32 launches. One dot per degraded copy. Rank correlation: wind error +0.90, level differences +0.39.")
+    fig.subplots_adjust(left=0.07, right=0.98, top=0.74, bottom=0.14, wspace=0.08)
+    names = list(base)
+    scores, wind, steer = (np.array([base[n][f] for n in names]) for f in ("score", "wind", "steer"))
+    picks = np.random.default_rng(0).integers(0, len(names), (10_000, len(names)))
+    gap = np.array([spearman(steer[i], scores[i]) - spearman(wind[i], scores[i]) for i in picks])
+    title(fig, "Control lost against two error measures",
+          f"Station keeping, 32 launches, one dot per copy ({len(names)}). Rank correlation with control lost: wind error {spearman(wind, scores):+.2f}, "
+          f"level-difference error {spearman(steer, scores):+.2f};\ndifference {np.mean(gap):+.2f} "
+          f"[{np.percentile(gap, 2.5):+.2f}, {np.percentile(gap, 97.5):+.2f}], 95% bootstrap over copies.")
     for ax, field, name in ((axes[0], "wind", "wind error (m/s, RMS)"), (axes[1], "steer", "level-difference error (m/s, RMS)")):
         style(ax, ylabel=ax is axes[0])
         for name_, v in base.items():
-            coarse = name_.split(":")[0] in ("levels", "frames", "grid")
-            ax.plot(v[field], v["score"], "o", color=BLUE if coarse else ORANGE, markersize=8, markeredgecolor=SURFACE, markeredgewidth=2)
-        o = base["offset"]
-        ax.annotate("uniform offset\nloses 0.90", (o[field], o["score"]), xytext=(14, -62) if field == "steer" else (-120, 6),
-                    textcoords="offset points", fontsize=8.5, color=INK, va="top", arrowprops=dict(arrowstyle="-", color=MUTED, linewidth=0.8))
+            kind = "coarse" if name_.split(":")[0] in ("levels", "frames", "grid") else "real" if name_ == "persistence" else "added"
+            ax.plot(v[field], v["score"], "o", color=FAMILY[kind], markersize=8, markeredgecolor=SURFACE, markeredgewidth=2)
         ax.set_xlabel(name, color=MUTED, fontsize=9)
-    axes[0].plot([], [], "o", color=BLUE, label="coarser copy (levels, frames, grid)")
-    axes[0].plot([], [], "o", color=ORANGE, label="error shape at 1x or 2x")
+    axes[0].plot([], [], "o", color=BLUE, label="coarser copy: levels, frames, grid (14)")
+    axes[0].plot([], [], "o", color=ORANGE, label="added error: offsets, random, at 1x or 2x (6)")
+    axes[0].plot([], [], "o", color=AQUA, label="real error: the wind 24 h earlier (1)")
     axes[0].legend(loc="lower right", frameon=False, fontsize=8.5, labelcolor=INK)
     fig.savefig(out / "test.png", dpi=200)
 
@@ -118,7 +128,7 @@ def test_figure(r: dict, out: Path) -> None:
 def ladders_figure(r: dict, out: Path) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(11, 3.8), sharey=True, facecolor=SURFACE, gridspec_kw=dict(width_ratios=[6, 5, 3]))
     fig.subplots_adjust(left=0.06, right=0.98, top=0.76, bottom=0.16, wspace=0.12)
-    title(fig, "How coarse a wind model can be", "Share of MPC's control lost at each step down; bars are 95% intervals. Dashed: a tenth lost.")
+    title(fig, "Control lost along each coarsening ladder", "Station keeping, 32 launches. Bars are 95% intervals over the launches.")
     for ax, (name, ladder, note) in zip(axes, (("altitude levels (truth: 18)", LEVELS, ""), ("frames in time (truth: hourly)", FRAMES, ""),
                                                 ("grid (truth: 2°)", GRID, ""))):
         style(ax, ylabel=ax is axes[0])
@@ -135,7 +145,7 @@ def shapes_figure(r: dict, out: Path) -> None:
     items += [(LABEL[c] + ", 2x", r[("base", 1.0, 12.0, c, 2.0)]) for c in ("offset", "offset_altitude")]
     fig, ax = plt.subplots(figsize=(9, 4), facecolor=SURFACE)
     fig.subplots_adjust(left=0.31, right=0.97, top=0.78, bottom=0.14)
-    title(fig, "Any error the size of a day-old forecast costs most of the control",
+    title(fig, "Control lost for each error shape",
           "Each shape scaled to 5.0 m/s RMS (1x), the error of the wind 24 h earlier; two offsets also at 2x.")
     ax.set_facecolor(SURFACE)
     y = np.arange(len(items))[::-1]
@@ -160,7 +170,7 @@ def shapes_figure(r: dict, out: Path) -> None:
 def interactions_figure(r: dict, out: Path) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(10, 3.9), sharey=True, facecolor=SURFACE)
     fig.subplots_adjust(left=0.07, right=0.98, top=0.76, bottom=0.16, wspace=0.1)
-    title(fig, "The levels loss is information, not reach; coarse frames stop a long horizon from paying",
+    title(fig, "Control lost: levels at two climb limits, frames at three horizons",
           "Left: the levels ladder at the base and twice the climb limit. Right: the frames ladder at three planning horizons.")
     ax = axes[0]
     style(ax)
