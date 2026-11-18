@@ -273,6 +273,15 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     starts at 1 h, and the kernel and the 1x error size are refitted in the tropics. `coast` (never climbs) is
     the fidelity score's floor. `scripts/dry_run_station.py` checks the setup leaves room, and picks the
     optimizer, before the sweep.
+55. **The fidelity score is in TWR50, and the sweep is `balloon_sim/fidelity.py`.** Score = (mean TWR50 of MPC
+    on the truth − on the copy) / (mean on the truth − coast's), a ratio of means over seeds with a paired
+    bootstrap interval. It replaces the cost-based share of decision 53: the dry run
+    (`docs/dry-run-station-2026-11-17.md`) showed coast's summed cost so large that a TWR50 drop from 0.70 to
+    0.36 read as 6% lost, and a per-seed ratio has near-zero denominators. Normalised descent is the optimizer
+    (as good as L-BFGS, a fifth of the time, measured on 8 seeds). A copy is planned on as a plain field
+    (`belief.Truth`), readings off. Truth: ERA5 2021-07-16, 240 h hourly, 18 levels, 30S to 30N at 2 degrees
+    (`era5_tropics_jul2021_l18_1h.npz`). The fixed plan is dropped from this sweep: the score does not use
+    it, and a 960-step open-loop plan is costly. 42 cells a seed, 1,344 at 32 seeds.
 
 ## Open
 
