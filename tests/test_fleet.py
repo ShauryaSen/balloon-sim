@@ -169,3 +169,26 @@ def test_the_arms_and_the_reader_keep_fleets_apart():
     rows = [{"controller": "mpc", "objective": "reach", "goal_km": 2000.0, "task.n_moves": 50},
             {"controller": "mpc", "objective": "reach", "goal_km": 2000.0, "task.n_moves": 50, "n_agents": 4}]
     assert one_arm(rows) == rows[:1] and one_arm(rows, n_agents=4) == rows[1:]
+
+
+def test_between_replans_the_fleet_flies_on_along_its_last_plan():
+    """With replan_every = 3, a move that is not a multiple of 3 solves nothing: its climb is the first of the
+    plan carried in memory, and the memory shifts along by one"""
+    truth, balloon = a_record(), BalloonConfig()
+    mission, _ = fleet.draw_mission(a_task("station"), jax.random.key(1), truth)
+    planner = dataclasses.replace(SMALL, replan_every=3)
+    controller = fleet.mpc(balloon, planner, GPBelief(BELIEF, truth), "station", mission, 0, 9, 200.0, learns=False)
+    memory = controller.begin(jax.random.key(0), mission.starts)
+    carried = jnp.array([[0.3, -0.2, 0.1, 0.5, -0.4, 0.0]])
+    memory = memory._replace(previous=carried)
+    climb, after = controller.act(memory, jax.random.key(5), mission.starts, jnp.array(1), jnp.zeros((1, 2)))
+    assert jnp.allclose(climb, carried[:, 0]) and jnp.allclose(after.previous[:, :-1], carried[:, 1:])
+    solved, _ = controller.act(memory, jax.random.key(5), mission.starts, jnp.array(3), jnp.zeros((1, 2)))
+    assert not jnp.allclose(solved, carried[:, 0])  # on a multiple of 3 it solves afresh
+
+
+def test_coast_never_climbs():
+    truth = a_record()
+    mission, _ = fleet.draw_mission(a_task("station"), jax.random.key(1), truth)
+    flight = fleet.fly(BalloonConfig(), fleet.coast(mission), truth, mission, "station", 6, jax.random.key(2), 200.0)
+    assert jnp.allclose(flight.climbs_km, 0.0) and jnp.allclose(flight.visited.altitude_km, mission.starts.altitude_km[:, None])

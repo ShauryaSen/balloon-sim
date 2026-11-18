@@ -262,6 +262,17 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     about zero on the undegraded copy; station keeping leads; the kind-of-error property becomes five shapes at
     one size, persistence among them; amplitude is dropped; MPC first, PPO once it works on the truth, at 5
     training seeds. The talk's other points are in `docs/directions-2026-11-17.md`.
+54. **Station keeping on Pasetsky et al.'s control setup** (arXiv 2511.07761, Sec. VI, Fig. 3, their ablation's
+    best values): an action every 3 min, a 12 h horizon (240 steps), a replan every 72 min
+    (`PlannerConfig.replan_every = 24`, fleet controllers), 100 starting plans, 2-day episodes (960 steps),
+    time within 50 km (TWR50), launches within 10 degrees of the equator. Our 3 h move carried the balloon
+    about 100 km, twice the station radius, so station keeping could not be scored the way the field scores
+    it. Kept from ours: the climb limit, 1.1 km per 3 h (18.3 m per step, unverified against a real balloon),
+    the full field as the planner's wind (their GP-column is the grid ladder's column rung), no discount (their
+    gamma is not stated). Consequences: the truth becomes hourly (the Unicorn store is), the frames ladder
+    starts at 1 h, and the kernel and the 1x error size are refitted in the tropics. `coast` (never climbs) is
+    the fidelity score's floor. `scripts/dry_run_station.py` checks the setup leaves room, and picks the
+    optimizer, before the sweep.
 
 ## Open
 

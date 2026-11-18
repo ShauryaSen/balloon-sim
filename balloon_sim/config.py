@@ -22,6 +22,10 @@ class PlannerConfig:
     iterations: int = 100  # refinement steps, at most
     step_size: float = 1.0  # normalised gradient descent's step
     tolerance: float = 1e-7  # stop refining once the gradient is this small
+    replan_every: int = 1
+    """Moves between solves; in between, the controller flies on along its last plan. 1 replans every move, as
+    every sweep before 2026-11-17 did. Pasetsky et al. replan every 24 three-minute steps, 72 min (their Fig. 3:
+    shorter helps, with diminishing returns). Fleet controllers only"""
 
 
 @dataclass(frozen=True)

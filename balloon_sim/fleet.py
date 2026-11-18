@@ -284,13 +284,25 @@ def mpc(
             readings = readings.add(State(state.lat[i], state.lon[i], state.altitude_km[i], state.hours[i]), reading[i])
         given = readings if learns else memory.readings
         visited = memory.visited | reached(state, mission, radius_km)
-        k_winds, k_plan = jax.random.split(key)
-        climbs = plan(balloon, planner, objective, k_plan, belief.winds(k_winds, n_winds, given), state, mission,
-                      memory.previous, n_moves - move, radius_km, visited)
+
+        def solve(_):
+            k_winds, k_plan = jax.random.split(key)
+            return plan(balloon, planner, objective, k_plan, belief.winds(k_winds, n_winds, given), state, mission,
+                        memory.previous, n_moves - move, radius_km, visited)
+
+        # Solve on the moves replan_every divides; in between, fly on along the last plan, already shifted to now
+        climbs = solve(None) if planner.replan_every == 1 else jax.lax.cond(move % planner.replan_every == 0, solve, lambda _: memory.previous, None)
         shifted = jnp.concatenate([climbs[:, 1:], jnp.zeros((n, 1))], axis=1)
         return climbs[:, 0], FleetMemory(shifted, readings, visited)
 
     return Controller(begin, act)
+
+
+def coast(mission: Mission) -> Controller:
+    """Never climbs or sinks: the balloon drifts on the level it launched at. The zero-control floor the
+    fidelity score divides by (decision 53)"""
+    n = mission.starts.lat.shape[0]
+    return Controller(lambda key, state: jnp.zeros(()), lambda memory, key, state, move, reading: (jnp.zeros(n), memory))
 
 
 def hindsight(balloon: BalloonConfig, planner: PlannerConfig, truth: WindField, objective: str, mission: Mission, n_moves: int, radius_km: float) -> Controller:
