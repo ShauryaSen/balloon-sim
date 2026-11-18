@@ -152,6 +152,21 @@ def error_size(truth: WindField, earlier: WindField, lat_band: tuple[float, floa
     return float(jnp.sqrt(jnp.mean(error**2)))
 
 
+def errors(truth: WindField, copy: WindField, lat_band: tuple[float, float]) -> dict:
+    """How wrong a copy is, in the launch band, measured two ways before anything is flown:
+
+        wind_error_ms               RMS per component of the copy's wind minus the truth's
+        level_difference_error_ms   the same for the differences between adjacent levels: what the balloon
+                                    steers on, by the central hypothesis
+
+    The primary test ranks the copies by each and asks which ranking control loss follows. The seam column is
+    left out, since it repeats the first."""
+    rows = (truth.lat >= lat_band[0]) & (truth.lat <= lat_band[1])
+    wrong = (copy.uv - truth.uv)[:, :, rows, :-1]
+    steer = wrong[:, 1:] - wrong[:, :-1]  # the change in each level-to-level difference
+    return {"wind_error_ms": float(jnp.sqrt(jnp.mean(wrong**2))), "level_difference_error_ms": float(jnp.sqrt(jnp.mean(steer**2)))}
+
+
 # --- by name ----------------------------------------------------------------------------------------------------
 
 COPIES = ("truth", "levels", "frames", "grid", "offset", "offset_altitude", "random", "random_altitude", "persistence")
