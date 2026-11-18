@@ -2,7 +2,7 @@
 
     uv run scripts/plot_error_covariance.py results/error-covariance-2026-11-18.json --out figures/error-covariance/k.png
 
-Four panels: horizontal (east, north, along and across the wind), altitude (up and down), time, and the east
+Four panels: horizontal (east, north, along and across the wind), altitude (every pair of levels), time, and the east
 error with the north error. Lines are the mean over the records (weeks), the band their range; the dashed grey
 line is the kernel every sweep so far assumed (BeliefConfig: Matern 5/2 over 544 km and 1.3 km, Matern 3/2 over
 9.1 h, u and v unrelated). Also prints each direction's reach: where the correlation first falls below 1/e.
@@ -108,10 +108,9 @@ def main() -> None:
     style(ax, "altitude gap (km)")
     bins = np.arange(-0.175, 6.2, 0.35)
     mid = bins[:-1] + 0.175
-    for key, color, name in (("up", BLUE, "upward"), ("down", ORANGE, "downward")):
-        ys = altitude_curves(results, key, bins)
-        band(ax, mid, ys, color, name)
-        reaches[name] = reach(mid, np.nanmean(ys, 0))
+    ys = altitude_curves(results, "up", bins)  # every pair of levels once; up and down are the same pairs pooled
+    band(ax, mid, ys, BLUE, "measured")
+    reaches["altitude"] = reach(mid, np.nanmean(ys, 0))
     z = np.linspace(0, 6, 100)
     ax.plot(z, matern52(z / k.altitude_km), color=MUTED, linestyle="--", linewidth=1.2, label="assumed")
     ax.set_title("altitude", fontsize=10, color=INK, loc="left")
