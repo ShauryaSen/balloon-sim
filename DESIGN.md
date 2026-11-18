@@ -282,6 +282,19 @@ How well can a balloon controller do as the wind forecast gets worse, compared t
     (`belief.Truth`), readings off. Truth: ERA5 2021-07-16, 240 h hourly, 18 levels, 30S to 30N at 2 degrees
     (`era5_tropics_jul2021_l18_1h.npz`). The fixed plan is dropped from this sweep: the score does not use
     it, and a 960-step open-loop plan is costly. 42 cells a seed, 1,344 at 32 seeds.
+56. **Forecast error as people build it, swept in size** (`degrade.error_model`, `fidelity.error_cells`, decided
+    2026-11-18). The constructed error shapes (offsets, flat random) and the two error measures they were built to
+    separate are dropped from the reporting: the experiment reports control lost per property, and the error
+    property is now the error models a simulator is actually built with. Four, each keeping its own shape and
+    scaled to one size per cell: BLE's simplex noise (`env/simplex_wind_noise.py`, its five harmonics per
+    component, read 2026-11-18); BLE's GP (`env/wind_gp.py`: Matern 1/2, 357 km, 326 Pa, 9.6 h); our GP fitted to
+    ERA5's day-old error (BeliefConfig); and the real persistence error rescaled. Sizes 0.5, 1, 2, 3.5, 5 m/s RMS
+    per component over the launch band, so a loss is put down to shape at equal size, with BLE's own size (1.05,
+    measured on its code), Loon's 12 h error (3.5, BLE's code comment) and a day-old forecast here (5.0, measured)
+    marked. Run at their authors' sizes only, the models would differ in size and shape at once and say more about
+    BLE's settings than about the kinds of error. Pressure for the BLE models is the standard atmosphere's
+    isothermal layer; km are flat at the equator (both assumed). The pre-registered two-measure test was run and
+    is reported once in `docs/fidelity-results-2026-11-17.md`, not carried forward.
 
 ## Open
 

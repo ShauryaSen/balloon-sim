@@ -1,16 +1,18 @@
-"""The fidelity sweep's results as four figures, for a meeting: the main test, the ladders, the error shapes, the
-two interactions
+"""The fidelity experiment's results as figures, for a meeting: the coarsening ladders, the forecast error models
+by size, and the two interactions
 
-    uv run scripts/plot_fidelity.py results/rows-fidelity-2026-11-17.jsonl --out figures/fidelity
+    uv run scripts/plot_fidelity.py results/rows-fidelity-2026-11-17.jsonl results/rows-errors-2026-11-18.jsonl
 
 Every number is the score of balloon_sim.fidelity.score: the share of MPC's time within 50 km a copy costs,
 against coast (0 nothing lost, 1 no better than never steering), with its 95% paired bootstrap interval over
 the seeds. Each copy is scored against MPC on the truth in its own arm.
 
-    test.png          score against the wind error, and against the level-difference error, one dot a copy
     ladders.png       score at each step of the levels, frames and grid ladders
-    shapes.png        score of each error shape at 1x, and the two offsets at 2x, a day-old forecast's error
+    errors.png        score of each forecast error model at each size (the errors arm)
     interactions.png  levels at two climb limits; frames at three horizons
+
+test.png and shapes.png (the two error measures, and the constructed error shapes) were dropped on 2026-11-18;
+their functions stay here, uncalled, so the 2026-11-17 figures can be redrawn.
 
 Titles name what is plotted, not what it shows; the numbers under them are the reading.
 """
@@ -40,9 +42,9 @@ LABEL = {
 }
 
 
-def load(path: Path) -> dict:
+def load(paths: list[Path]) -> dict:
     """{(arm, climb, horizon, copy, size): score dict with the copy's mean errors}"""
-    files = sorted(path.glob("*.jsonl")) if path.is_dir() else [path]
+    files = [f for path in paths for f in (sorted(path.glob("*.jsonl")) if path.is_dir() else [path])]
     rows = [json.loads(line) for f in files for line in f.read_text().splitlines() if line.strip()]
     coast = {r["seed"]: r["covered_fraction"] for r in rows if r["controller"] == "coast"}
     groups: dict[tuple, dict[int, dict]] = defaultdict(dict)
@@ -193,19 +195,56 @@ def interactions_figure(r: dict, out: Path) -> None:
     fig.savefig(out / "interactions.png", dpi=200)
 
 
+YELLOW = "#eda100"  # categorical slot 4: four lines pass the adjacent-pair checks, and a legend names each
+MODELS = (("simplex", "BLE simplex noise", BLUE), ("gp_ble", "BLE's GP", ORANGE), ("gp_fitted", "our GP, fitted to ERA5", AQUA),
+          ("persistence_scaled", "real: the wind 24 h earlier, rescaled", YELLOW))
+MARKS = ((1.05, "BLE's size"), (3.5, "Loon 12 h forecast\n(BLE code comment)"), (5.0, "day-old forecast\n(measured here)"))
+
+
+def errors_figure(r: dict, out: Path) -> bool:
+    keys = sorted({k[4] for k in r if k[0] == "errors"})
+    if not keys:
+        return False
+    fig, ax = plt.subplots(figsize=(9.5, 4.6), facecolor=SURFACE)
+    fig.subplots_adjust(left=0.08, right=0.97, top=0.8, bottom=0.13)
+    title(fig, "Control lost for each forecast error model, by size",
+          "Station keeping, 32 launches. Each model keeps its own shape and is scaled to the size on the x-axis; bars are 95% intervals.")
+    style(ax)
+    for x, name in MARKS:
+        ax.axvline(x, color=GRIDLINE, linewidth=1.2, zorder=0)
+        ax.text(x, 1.08, name, fontsize=7.5, color=MUTED, ha="center", va="bottom")
+    for model, name, color in MODELS:
+        sizes = [s for s in keys if ("errors", 1.0, 12.0, model, s) in r]
+        if not sizes:
+            continue
+        s = [r[("errors", 1.0, 12.0, model, z)] for z in sizes]
+        bars(ax, np.array(sizes), s, color)
+        ax.plot([], [], "o-", color=color, label=name)
+    ax.legend(loc="lower right", frameon=False, fontsize=8.5, labelcolor=INK)
+    ax.set_xlim(0, 5.3)
+    ax.set_xlabel("error size (m/s, RMS per component over 10S to 10N)", color=MUTED, fontsize=9)
+    ax.set_ylim(-0.1, 1.25)
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    fig.savefig(out / "errors.png", dpi=200)
+    return True
+
+
 def main() -> None:
     ask = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ask.add_argument("rows")
+    ask.add_argument("rows", nargs="+", help="row files or folders: the sweep's, the errors arm's, or both")
     ask.add_argument("--out", default="figures/fidelity")
     a = ask.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    r = load(Path(a.rows))
-    test_figure(r, out)
-    ladders_figure(r, out)
-    shapes_figure(r, out)
-    interactions_figure(r, out)
-    print("wrote", ", ".join(str(out / n) for n in ("test.png", "ladders.png", "shapes.png", "interactions.png")))
+    r = load([Path(p) for p in a.rows])
+    wrote = []
+    if ("base", 1.0, 12.0, "levels:6", 0.0) in r:
+        ladders_figure(r, out)
+        interactions_figure(r, out)
+        wrote += ["ladders.png", "interactions.png"]
+    if errors_figure(r, out):
+        wrote.append("errors.png")
+    print("wrote", ", ".join(str(out / n) for n in wrote))
 
 
 if __name__ == "__main__":
