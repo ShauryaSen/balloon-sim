@@ -5,7 +5,7 @@ import numpy as np
 from balloon_sim.belief import GPBelief, Readings, error_draws, forecast
 from balloon_sim.config import BeliefConfig
 from balloon_sim.dynamics import State, distance_km
-from balloon_sim.wind import WindField
+from balloon_sim.wind import WindField, wind_at
 
 CONFIG = BeliefConfig(sigma=2.8)
 HOURS = jnp.array([0.0, 12.0, 24.0, 48.0])
@@ -89,3 +89,45 @@ def test_a_reading_pins_the_mean_and_every_draw_there_and_fades_with_distance():
     # the pull is in the kernel's direction: a point 5 degrees north, same time and altitude, moves part of the way
     near = (1, 1, 3, 2)
     assert 7.5 < float(posterior_mean[near][0]) < 12.0
+
+
+def _kernel_beliefs():
+    from balloon_sim.belief import KernelBelief, MeasuredKernel
+    from balloon_sim.config import BeliefConfig
+    hours, alt = jnp.arange(0, 31.0), jnp.linspace(14.3, 20.2, 18)
+    lat, lon = jnp.arange(-12, 13, 2.0), jnp.arange(80, 131, 2.0)
+    mean = WindField(hours, alt, lat, lon, jnp.zeros((31, 18, 13, 26, 2)))
+    levels = np.linspace(14.3, 20.2, 18)
+    measured = MeasuredKernel(1.5, 1055.0, 715.0, 10.8, jnp.array(levels),
+                              jnp.array(np.cos(np.subtract.outer(levels, levels) * 1.2) * np.exp(-np.abs(np.subtract.outer(levels, levels)) / 3)))
+    return mean, {kind: KernelBelief(mean, kind, 5.0, BeliefConfig(), measured) for kind in ("assumed", "measured")}
+
+
+def _with_readings(n):
+    from balloon_sim.dynamics import State
+    r = Readings.empty(40)
+    for i in range(n):
+        r = r.add(State(jnp.array(0.0), jnp.array(100.0 + 0.1 * i), jnp.array(17.2), jnp.array(10.0 + 0.05 * i)), jnp.array([3.0, 0.0]))
+    return r
+
+
+def test_a_kernel_belief_with_no_readings_is_the_forecast():
+    mean, beliefs = _kernel_beliefs()
+    for b in beliefs.values():
+        assert jnp.allclose(b.winds(jax.random.PRNGKey(0), 0, _with_readings(0)).uv[0], mean.uv)
+
+
+def test_a_kernel_belief_passes_near_its_readings_and_only_corrects_the_window():
+    mean, beliefs = _kernel_beliefs()
+    for kind, b in beliefs.items():
+        uv = b.winds(jax.random.PRNGKey(0), 0, _with_readings(13)).uv[0]
+        at = wind_at(mean._replace(uv=uv), jnp.array(0.0), jnp.array(100.6), jnp.array(17.2), jnp.array(10.6))
+        assert 2.5 < float(at[0]) < 3.0, kind  # pulled to the 3 m/s readings, short of it by the reading noise
+        assert jnp.allclose(uv[:10], 0.0) and jnp.allclose(uv[26:], 0.0), kind  # outside 10 h to 24 h, untouched
+
+
+def test_the_measured_kernel_can_correct_the_other_way_at_another_altitude():
+    mean, beliefs = _kernel_beliefs()
+    uv = beliefs["measured"].winds(jax.random.PRNGKey(0), 0, _with_readings(13)).uv[0]
+    far = wind_at(mean._replace(uv=uv), jnp.array(0.0), jnp.array(100.6), jnp.array(19.9), jnp.array(10.6))
+    assert float(far[0]) < 0.0  # the test matrix turns negative about 2.6 km away, as the measured one does

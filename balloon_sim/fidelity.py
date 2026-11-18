@@ -90,6 +90,21 @@ def error_cells(seeds: tuple[int, ...] = tuple(range(32))) -> list[Cell]:
     return out
 
 
+READINGS = ("forecast_blind", "forecast_assumed", "forecast_measured")
+"""The readings arm (2026-11-18): MPC plans on the real day-old forecast (the record's, the truth 24 h earlier)
+and either sets its readings aside, or corrects the forecast with them through the kernel assumed so far or the
+one measured on eight other weeks (balloon_sim.belief.KernelBelief)"""
+MEASURED_KERNEL = "results/measured-kernel-2026-11-18.json"
+
+
+def readings_cells(seeds: tuple[int, ...] = tuple(range(32))) -> list[Cell]:
+    out: list[Cell] = []
+    for seed in seeds:
+        out.append(Cell("coast", seed, "truth", 0.0, 1.0, BASE_HORIZON_HOURS, "readings"))
+        out += [Cell("mpc", seed, copy, 0.0, 1.0, BASE_HORIZON_HOURS, "readings") for copy in ("truth",) + READINGS]
+    return out
+
+
 def configs(cell: Cell) -> tuple[BalloonConfig, PlannerConfig, TaskConfig]:
     """The balloon, planner and task a cell flies with"""
     balloon = BalloonConfig(step_hours=STEP_HOURS, substeps=1, climb_cap_km=CLIMB_KM_PER_3H * STEP_HOURS / 3.0 * cell.climb_scale)

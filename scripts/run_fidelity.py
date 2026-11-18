@@ -19,10 +19,10 @@ import jax
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from balloon_sim import degrade, fleet
-from balloon_sim.belief import Truth
+from balloon_sim.belief import KernelBelief, MeasuredKernel, Truth
 from balloon_sim.cells import keys
 from balloon_sim.config import BeliefConfig
-from balloon_sim.fidelity import BASE_HORIZON_HOURS, LAUNCH_BAND, Cell, configs
+from balloon_sim.fidelity import BASE_HORIZON_HOURS, LAUNCH_BAND, MEASURED_KERNEL, READINGS, Cell, configs
 from balloon_sim.results import write_rows
 from balloon_sim.wind import load_record
 
@@ -48,11 +48,18 @@ def fly_one(cell: Cell, truth, earlier, one_x: float, out: str) -> None:
     k_task, k_error, k_fly = keys(cell.seed)
     mission, task = fleet.draw_mission(task_config, k_task, truth)
     size_ms = cell.size if cell.arm == "errors" else cell.size * one_x  # the errors arm gives its sizes in m/s
-    copied = degrade.copy(cell.copy, truth, k_error, BeliefConfig(), size_ms, earlier, LAUNCH_BAND)
+    if cell.copy in READINGS:  # the readings arm: plan on the real forecast, correcting it or not
+        copied = earlier
+        kind = cell.copy.removeprefix("forecast_")
+        belief = Truth(earlier) if kind == "blind" else KernelBelief(earlier, kind, one_x, BeliefConfig(), MeasuredKernel.load(MEASURED_KERNEL))
+    else:
+        copied = degrade.copy(cell.copy, truth, k_error, BeliefConfig(), size_ms, earlier, LAUNCH_BAND)
+        belief = Truth(copied)  # readings off: the copy is the whole of what MPC knows, planned on as a plain field
     if cell.controller == "coast":
         controller = fleet.coast(mission)
-    else:  # readings off: the copy is the whole of what MPC knows, so it is planned on as a plain field
-        controller = fleet.mpc(balloon, planner, Truth(copied), "station", mission, 0, task_config.n_moves, task_config.arrival_km, learns=False)
+    else:
+        learns = cell.copy in READINGS and cell.copy != "forecast_blind"
+        controller = fleet.mpc(balloon, planner, belief, "station", mission, 0, task_config.n_moves, task_config.arrival_km, learns=learns)
     began = time.perf_counter()
     flight = fleet.fly(balloon, controller, truth, mission, "station", task_config.n_moves, k_fly, task_config.arrival_km)
     jax.block_until_ready(flight.cost_km)
