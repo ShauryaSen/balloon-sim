@@ -97,6 +97,16 @@ one measured on eight other weeks (balloon_sim.belief.KernelBelief)"""
 MEASURED_KERNEL = "results/measured-kernel-2026-11-18.json"
 
 
+GREEDY_HOURS = 3.0
+"""Greedy for the RL go/no-go (decision 57): MPC that looks only 3 h ahead, on the same forecast, readings and
+measured K, replanning as often. Our earlier greedy (decision 51) was a one-move horizon of 3 h; this keeps that
+reach at 3 min steps"""
+
+
+def greedy_cells(seeds: tuple[int, ...] = tuple(range(32))) -> list[Cell]:
+    return [Cell("mpc", seed, "forecast_measured", 0.0, 1.0, GREEDY_HOURS, "greedy") for seed in seeds]
+
+
 def readings_cells(seeds: tuple[int, ...] = tuple(range(32))) -> list[Cell]:
     out: list[Cell] = []
     for seed in seeds:
